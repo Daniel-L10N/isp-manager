@@ -3,7 +3,7 @@
  * Handles authentication, requests, and response parsing.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = '';
 
 interface RequestOptions {
   method?: string;
@@ -35,30 +35,41 @@ class ApiClient {
 
   private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...options.headers,
     };
+
+    if (options.body) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      method: options.method || 'GET',
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}${endpoint}`, {
+        method: options.method || 'GET',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        cache: 'no-cache',
+        credentials: 'same-origin',
+      });
+    } catch (err: any) {
+      throw new Error('Error de conexión con el servidor');
+    }
 
     if (!response.ok) {
       if (response.status === 401) {
-        // Token expired or invalid - redirect to login
         this.setToken(null);
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
       }
-      const error = await response.json().catch(() => ({ detail: 'Error de conexión' }));
-      throw new Error(error.detail || `Error ${response.status}`);
+      try {
+        const error = await response.json();
+        throw new Error(error.detail || `Error ${response.status}`);
+      } catch (e: any) {
+        if (e.message && !e.message.startsWith('Error ')) throw e;
+        throw new Error(`Error ${response.status}`);
+      }
     }
 
     return response.json();
