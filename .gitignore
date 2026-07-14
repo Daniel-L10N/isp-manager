@@ -10,9 +10,6 @@ __pycache__/
 dist/
 build/
 .eggs/
-*.db
-*.db-shm
-*.db-wal
 
 # === Node / Frontend ===
 node_modules/
