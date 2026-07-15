@@ -17,17 +17,13 @@ router = APIRouter()
 
 
 def _calculate_cash_funds(db: Session) -> float:
-    """Calculate current cash funds from settings and cash movements."""
-    setting = db.query(Setting).filter(Setting.key == "cash_funds").first()
-    base = float(setting.value) if setting and setting.value else 0.0
-
-    # Sum all cash movements
+    """Calculate current cash funds from movements only.
+    No base setting - all money comes from ingreso/egreso movements."""
     total_income = db.query(func.coalesce(func.sum(CashMovement.amount), 0))\
         .filter(CashMovement.type == "ingreso").scalar()
     total_expenses = db.query(func.coalesce(func.sum(CashMovement.amount), 0))\
         .filter(CashMovement.type == "egreso").scalar()
-
-    return base + float(total_income) - float(total_expenses)
+    return float(total_income) - float(total_expenses)
 
 
 @router.get("/", response_model=DashboardResponse)
@@ -38,7 +34,7 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
     current_year = now.year
     today = date.today()
 
-    # Cash funds
+    # Cash funds - calculated from movements only
     cash_funds = _calculate_cash_funds(db)
 
     # Monthly income - sum of payments in current month
@@ -81,7 +77,7 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
     total_clients = db.query(func.count(Client.id))\
         .filter(Client.is_active == True).scalar()
 
-    # Delinquent clients - clients who have not paid this month
+    # Delinquent clients
     delinquent_clients = db.query(func.count(Client.id))\
         .filter(
             Client.is_active == True,
@@ -95,7 +91,7 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
             ),
         ).scalar()
 
-    # Upcoming payments - clients whose cutoff is within next 5 days
+    # Upcoming payments
     upcoming = []
     clients_due = db.query(Client).filter(
         Client.is_active == True,

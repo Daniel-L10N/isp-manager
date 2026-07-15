@@ -98,7 +98,6 @@ def init_default_settings(db: Session):
         "company_phone": "",
         "company_email": "",
         "currency": "MXN",
-        "cash_funds": "0",
     }
     for key, value in defaults.items():
         existing = db.query(Setting).filter(Setting.key == key).first()
