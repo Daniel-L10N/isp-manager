@@ -36,7 +36,7 @@ def _generate_client_id(db: Session) -> str:
 def _calculate_annual_cost(contract_date: date, monthly_cost: float) -> float:
     """Calculate annual payment: remaining months in year × monthly cost."""
     contract_month = contract_date.month
-    remaining_months = 12 - contract_month + 1
+    remaining_months = 12
     return remaining_months * monthly_cost
 
 

@@ -19,6 +19,8 @@ interface DashboardData {
   cash_funds: number;
   monthly_income: number;
   yearly_income: number;
+  expected_monthly_income: number;
+  expected_yearly_income: number;
   total_assets: number;
   total_capital: number;
   active_clients: number;
@@ -105,16 +107,18 @@ export default function DashboardPage() {
       textColor: 'text-emerald-600',
     },
     {
-      title: 'Ingresos del Mes',
-      value: formatCurrency(data.monthly_income, currency),
+      title: 'Ingreso Esperado (Mes)',
+      value: formatCurrency(data.expected_monthly_income, currency),
+      subtitle: formatCurrency(data.monthly_income, currency) + ' cobrado',
       icon: TrendingUp,
       color: 'bg-blue-500',
       bg: 'bg-blue-50',
       textColor: 'text-blue-600',
     },
     {
-      title: 'Ingresos del Año',
-      value: formatCurrency(data.yearly_income, currency),
+      title: 'Ingreso Esperado (Año)',
+      value: formatCurrency(data.expected_yearly_income, currency),
+      subtitle: formatCurrency(data.yearly_income, currency) + ' cobrado',
       icon: Calendar,
       color: 'bg-violet-500',
       bg: 'bg-violet-50',
@@ -208,6 +212,11 @@ export default function DashboardPage() {
               <p className="text-lg font-bold text-gray-800 mt-1">
                 {card.value}
               </p>
+              {(card as any).subtitle && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {(card as any).subtitle}
+                </p>
+              )}
             </div>
           );
         })}

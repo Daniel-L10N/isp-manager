@@ -91,6 +91,8 @@ class ApiClient {
       cash_funds: number;
       monthly_income: number;
       yearly_income: number;
+      expected_monthly_income: number;
+      expected_yearly_income: number;
       total_assets: number;
       total_capital: number;
       active_clients: number;

@@ -49,12 +49,22 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
             Payment.status == "pagado",
         ).scalar()
 
-    # Yearly income
+    # Yearly income - sum of payments in current year
     yearly_income = db.query(func.coalesce(func.sum(Payment.amount), 0))\
         .filter(
             func.extract("year", Payment.date) == current_year,
             Payment.status == "pagado",
         ).scalar()
+
+    # Expected monthly income - sum of monthly_cost from all active clients
+    expected_monthly_income = db.query(func.coalesce(func.sum(Client.monthly_cost), 0))\
+        .filter(
+            Client.is_active == True,
+            Client.status == "activo",
+        ).scalar()
+
+    # Expected yearly income - 12 * expected monthly
+    expected_yearly_income = float(expected_monthly_income) * 12
 
     # Total assets value
     total_assets = db.query(func.coalesce(func.sum(Asset.approximate_value), 0))\
@@ -71,8 +81,7 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
     total_clients = db.query(func.count(Client.id))\
         .filter(Client.is_active == True).scalar()
 
-    # Delinquent clients - clients whose last payment is more than cutoff_day + 5 days past
-    # Simplified: clients who haven't paid this month and are past cutoff
+    # Delinquent clients - clients who have not paid this month
     delinquent_clients = db.query(func.count(Client.id))\
         .filter(
             Client.is_active == True,
@@ -94,12 +103,10 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
     ).all()
 
     for client in clients_due:
-        # Determine next cutoff date
         cutoff = client.cutoff_day
         try:
             cutoff_date_this_month = date(current_year, current_month, cutoff)
         except ValueError:
-            # Handle invalid dates (e.g., day 31 in February)
             import calendar
             last_day = calendar.monthrange(current_year, current_month)[1]
             cutoff_day = min(cutoff, last_day)
@@ -107,7 +114,6 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
 
         days_until_cutoff = (cutoff_date_this_month - today).days
 
-        # If cutoff already passed, check next month
         if days_until_cutoff < 0:
             next_month = current_month + 1
             next_year = current_year
@@ -124,7 +130,6 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
             days_until_cutoff = (cutoff_date_next - today).days
 
         if 0 <= days_until_cutoff <= 5:
-            # Check if already paid this month
             paid = db.query(Payment).filter(
                 Payment.client_id == client.id,
                 func.extract("month", Payment.date) == current_month,
@@ -144,6 +149,8 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
         cash_funds=cash_funds,
         monthly_income=float(monthly_income),
         yearly_income=float(yearly_income),
+        expected_monthly_income=float(expected_monthly_income),
+        expected_yearly_income=float(expected_yearly_income),
         total_assets=float(total_assets),
         total_capital=float(total_capital),
         active_clients=active_clients or 0,

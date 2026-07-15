@@ -183,6 +183,91 @@ nginx (:8080)
 
 ---
 
+## ⚠️ ADVERTENCIA: Lo que NO debe modificarse
+
+Este documento describe las piezas críticas del sistema. Modificarlas sin cuidado **rompe la aplicación**.
+
+### Frontend (`frontend/lib/api.ts`)
+
+| Línea / función | Por qué NO tocarlo |
+|---|---|
+| `const API_BASE = '';` | Debe estar **vacío** para que las llamadas vayan al mismo origen (nginx proxy). Si se cambia a `http://localhost:8000`, el celular intentará conectarse a sí mismo y fallará. |
+| `cache: 'no-cache'` en `fetch()` | Evita que el navegador use respuestas viejas. Si se quita, pueden aparecer datos desactualizados. |
+| `credentials: 'same-origin'` | Envía cookies/credenciales solo al mismo origen. Cambiarlo puede causar errores de autenticación. |
+| Solo enviar `Content-Type: application/json` cuando hay body | Ponerlo en GET requests puede hacer que algunos proxies rechacen la petición. |
+
+### Backend (`backend/requirements.txt`)
+
+| Paquete | Por qué la versión es crítica |
+|---|---|
+| `bcrypt==4.0.1` | Versiones 5.x rompen la compatibilidad con `passlib`. No actualizar. |
+| `passlib[bcrypt]` | No cambiar a otra versión sin probar que el hash de contraseñas siga funcionando. |
+
+Si se necesita actualizar, **probar en un entorno aparte primero**.
+
+### nginx (`/etc/nginx/sites-available/isp-manager`)
+
+| Directiva | Por qué NO tocarlo |
+|---|---|
+| `proxy_pass http://backend_isp;` en `/api/` | Debe apuntar al backend en puerto 8000. |
+| `proxy_pass http://frontend_isp;` en `/` | Debe apuntar al frontend en puerto 3000. |
+| `proxy_set_header Authorization $http_authorization;` | Sin esto, el backend no recibe el token JWT y todas las peticiones autenticadas fallan. |
+| `proxy_next_upstream` | Permite reintentar si el backend se está reiniciando. Sin esto, cualquier reinicio genera 502. |
+
+### Tailscale Funnel
+
+```bash
+tailscale funnel --bg 8080
+```
+
+El funnel debe apuntar **siempre al puerto 8080** (nginx), no al 3000 (Next.js) ni al 8000 (FastAPI). Si se apunta directo a Next.js, las llamadas a la API fallarán porque Next.js no sirve `/api/*`.
+
+### Servicios systemd
+
+- **No agregar `Requires=` entre servicios.** Si el backend y frontend están vinculados, al reiniciar uno se cae el otro y no se levanta solo.
+- Los tres servicios deben ser independientes:
+  - `isp-manager-backend.service` → puerto 8000
+  - `isp-manager-frontend.service` → puerto 3000
+  - nginx → puerto 8080 (ya viene con el sistema)
+
+### Base de datos
+
+La DB se crea automáticamente al iniciar el backend. Si se borra el archivo `backend/isp_manager.db`, **se pierden todos los datos** pero el sistema la recrea vacía sin problema.
+
+---
+
+## SSH remoto vía Tailscale
+
+Desde cualquier dispositivo en tu tailnet (celular, laptop, etc.) puedes conectarte por SSH a este servidor:
+
+```bash
+ssh root@100.100.174.98
+```
+
+O usando el nombre del host:
+
+```bash
+ssh root@fibraya-server
+```
+
+Te pedirá la **contraseña del usuario root** del servidor.
+
+### Seguridad
+
+- El puerto SSH (22) **solo acepta conexiones desde la red de Tailscale** (100.64.0.0/10).
+- Intentar SSH desde la IP pública del servidor (187.188.11.68) **será bloqueado**.
+- Si pierdes acceso a Tailscale, necesitas acceder físicamente al servidor o por consola VPS.
+
+### Cambiar contraseña de root (si no la sabes)
+
+```bash
+passwd root
+```
+
+Elige una contraseña segura y guárdala en un lugar seguro.
+
+---
+
 ## Licencia
 
 Uso interno.

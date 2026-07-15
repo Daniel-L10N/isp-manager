@@ -231,6 +231,8 @@ class DashboardResponse(BaseModel):
     cash_funds: float
     monthly_income: float
     yearly_income: float
+    expected_monthly_income: float
+    expected_yearly_income: float
     total_assets: float
     total_capital: float
     active_clients: int
