@@ -40,8 +40,7 @@ export default function NewClientPage() {
   const calculateAnnualCost = (contractDate: string, monthlyCost: number): number => {
     if (!contractDate) return 0;
     const month = new Date(contractDate).getMonth() + 1;
-    const remainingMonths = 12 - month + 1;
-    return remainingMonths * monthlyCost;
+    return 12 * monthlyCost;
   };
 
   const selectedPlan = plans.find((p) => p.id === form.plan_id);
