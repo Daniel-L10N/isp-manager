@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp QR - JARVIS</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            color: white;
+        }
+        .container { text-align: center; padding: 2rem; }
+        .logo { font-size: 3rem; margin-bottom: 1rem; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .subtitle { color: #94a3b8; margin-bottom: 2rem; }
+        #qr-container { 
+            background: white; border-radius: 1rem; padding: 2rem;
+            display: inline-block; margin: 1rem 0;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        #qr-container canvas { display: block; }
+        .status { 
+            margin-top: 1.5rem; padding: 1rem 2rem; border-radius: 0.5rem;
+            font-weight: 600;
+        }
+        .status.loading { background: #1e40af; color: #93c5fd; }
+        .status.connected { background: #166534; color: #86efac; }
+        .status.error { background: #991b1b; color: #fca5a5; }
+        .instructions { 
+            color: #94a3b8; margin-top: 1.5rem; font-size: 0.9rem;
+            max-width: 400px; margin-left: auto; margin-right: auto;
+        }
+        .instructions ol { text-align: left; padding-left: 1.5rem; }
+        .instructions li { margin: 0.5rem 0; }
+        .name { color: #22d3ee; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🤖</div>
+        <h1><span class="name">JARVIS</span> - WhatsApp</h1>
+        <p class="subtitle">ISP Manager - Asistente Virtual</p>
+        
+        <div id="qr-container">
+            <div id="qr"></div>
+        </div>
+        
+        <div id="status" class="status loading">Conectando...</div>
+        
+        <div class="instructions">
+            <p><strong>Para conectar:</strong></p>
+            <ol>
+                <li>Abre WhatsApp en tu celular</li>
+                <li>Ve a <strong>Dispositivos vinculados</strong></li>
+                <li>Toca <strong>Vincular dispositivo</strong></li>
+                <li>Escanea el código QR de arriba</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            try {
+                const res = await fetch("/status");
+                const data = await res.json();
+                const statusEl = document.getElementById("status");
+                
+                if (data.isReady) {
+                    statusEl.className = "status connected";
+                    statusEl.innerHTML = "✅ Conectado como: " + data.client + " (" + data.phone + ")";
+                    return;
+                }
+                
+                if (data.hasQR) {
+                    const qrRes = await fetch("/qr");
+                    const qrData = await qrRes.json();
+                    if (qrData.qr) {
+                        document.getElementById("qr").innerHTML = "";
+                        QRCode.toCanvas(document.createElement("canvas"), qrData.qr, {
+                            width: 256,
+                            margin: 2
+                        }, (err, canvas) => {
+                            if (!err) document.getElementById("qr").appendChild(canvas);
+                        });
+                        statusEl.className = "status loading";
+                        statusEl.textContent = "Escanea el código QR con tu celular";
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        
+        checkStatus();
+        setInterval(checkStatus, 3000);
+    </script>
+</body>
+</html>
