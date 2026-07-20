@@ -221,9 +221,9 @@ async def get_whatsapp_status(current_user: User = Depends(get_current_user)):
             if response.status_code == 200:
                 data = response.json()
                 return WhatsAppStatusResponse(
-                    connected=data.get("connected", False),
+                    connected=data.get("isReady", False) or data.get("connected", False),
                     phone=data.get("phone"),
-                    name=data.get("name"),
+                    name=data.get("name") or data.get("client"),
                 )
     except httpx.RequestError:
         pass
