@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db, SessionLocal
 from app.auth import init_default_user, init_default_settings
+from app.scheduler import start_scheduler, shutdown_scheduler
 
 app = FastAPI(
     title="ISP Manager",
@@ -34,6 +35,13 @@ def on_startup():
         init_default_settings(db)
     finally:
         db.close()
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    """Shut down the SMS reminder scheduler on application shutdown."""
+    shutdown_scheduler()
 
 
 # Register route modules
