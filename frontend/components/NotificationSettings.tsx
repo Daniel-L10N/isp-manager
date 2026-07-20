@@ -30,9 +30,11 @@ export default function NotificationSettings() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const fetchConfig = useCallback(async () => {
+  const API_BASE = '/isp-manager';
+
+const fetchConfig = useCallback(async () => {
     try {
-      const res = await fetch('/api/sms/config');
+      const res = await fetch(`${API_BASE}/api/sms/config`);
       const data = await res.json();
       if (data.success) {
         setConfig(data.data);
@@ -59,7 +61,7 @@ export default function NotificationSettings() {
     setSuccess('');
 
     try {
-      const res = await fetch('/api/sms/config', {
+      const res = await fetch(`${API_BASE}/api/sms/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -82,7 +84,7 @@ export default function NotificationSettings() {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch('/api/sms/test', { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/sms/test`, { method: 'POST' });
       const data = await res.json();
       setTestResult(data.success ? '✅ Conectado' : `❌ ${data.error || data.message}`);
     } catch {
