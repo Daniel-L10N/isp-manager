@@ -213,6 +213,49 @@ class ApiClient {
 
   updateSettings = (data: any) =>
     this.request<any>('/api/settings/', { method: 'PUT', body: data });
+
+  // WhatsApp
+  getWhatsAppStatus = () =>
+    this.request<{ connected: boolean; phone?: string; name?: string }>('/api/whatsapp/status');
+
+  sendWhatsAppMessage = (data: { phone: string; message: string }) =>
+    this.request<any>('/api/whatsapp/send', { method: 'POST', body: data });
+
+  sendWhatsAppReminder = (data: { client_id: number; override_phone?: string }) =>
+    this.request<any>('/api/whatsapp/send-reminder', { method: 'POST', body: data });
+
+  sendBulkReminders = (data: { days_before: number }) =>
+    this.request<any>('/api/whatsapp/send-bulk-reminders', { method: 'POST', body: data });
+
+  getPendingReminders = (days_before: number = 3) =>
+    this.request<any[]>(`/api/whatsapp/reminders/pending?days_before=${days_before}`);
+
+  getAutomationSettings = () =>
+    this.request<{
+      reminder_days_before: number;
+      reminder_enabled: boolean;
+      isp_whatsapp_number: string;
+    }>('/api/whatsapp/automation-settings');
+
+  updateAutomationSettings = (data: {
+    reminder_days_before: number;
+    reminder_enabled: boolean;
+    isp_whatsapp_number: string;
+  }) =>
+    this.request<any>('/api/whatsapp/automation-settings', { method: 'PUT', body: data });
+
+  // SMS
+  getSMSConfig = () =>
+    this.request<any>('/api/sms/config');
+
+  updateSMSConfig = (config: Record<string, any>) =>
+    this.request<any>('/api/sms/config', { method: 'PUT', body: config });
+
+  testSMSConnection = () =>
+    this.request<any>('/api/sms/test', { method: 'POST' });
+
+  sendSMS = (phone: string, message: string) =>
+    this.request<any>('/api/sms/send', { method: 'POST', body: { phone, message } });
 }
 
 const api = new ApiClient();

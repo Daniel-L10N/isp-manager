@@ -11,7 +11,6 @@ from typing import List, Optional
 from app.database import get_db
 from app.models import Client, Plan, Payment, Setting, CashMovement, History, User
 from app.auth import get_current_user
-from app.helpers import add_history_entry
 from app.schemas import (
     ClientCreate, ClientUpdate, ClientResponse, ClientListResponse,
     PaymentCreate, PaymentResponse,
@@ -21,7 +20,10 @@ router = APIRouter()
 
 
 def _generate_client_id(db: Session) -> str:
-    """Auto-generate a sequential client ID in format CLI-XXXX."""
+    """
+    Auto-generate a sequential client ID in format CLI-XXXX.
+    Finds the highest existing number and increments by 1.
+    """
     last_client = db.query(Client).order_by(Client.id.desc()).first()
     if last_client:
         last_num = int(last_client.client_id.split("-")[1])
@@ -32,8 +34,48 @@ def _generate_client_id(db: Session) -> str:
 
 
 def _calculate_annual_cost(contract_date: date, monthly_cost: float) -> float:
-    """Calculate annual payment: 12 x monthly cost."""
+    """Calculate annual payment: 12 months × monthly cost."""
     return 12 * monthly_cost
+
+
+def _add_history_entry(
+    db: Session,
+    type: str,
+    description: str,
+    amount: Optional[float] = None,
+    username: str = "admin",
+):
+    """Add an entry to the general history log."""
+    now = datetime.utcnow()
+    # Get current cash funds for balance
+    cash_setting = db.query(Setting).filter(Setting.key == "cash_funds").first()
+    base = float(cash_setting.value) if cash_setting and cash_setting.value else 0.0
+    total_income = db.query(func.coalesce(func.sum(CashMovement.amount), 0))\
+        .filter(CashMovement.type == "ingreso").scalar()
+    total_expenses = db.query(func.coalesce(func.sum(CashMovement.amount), 0))\
+        .filter(CashMovement.type == "egreso").scalar()
+    balance = base + float(total_income) - float(total_expenses)
+
+    entry = History(
+        date=now.date(),
+        time=now.strftime("%H:%M"),
+        user=username,
+        type=type,
+        description=description,
+        amount=amount,
+        balance_after=balance,
+    )
+    db.add(entry)
+    db.commit()
+
+
+def _update_cash_funds(db: Session, amount: float):
+    """Update the cash_funds setting."""
+    setting = db.query(Setting).filter(Setting.key == "cash_funds").first()
+    if setting:
+        current = float(setting.value) if setting.value else 0.0
+        setting.value = str(current + amount)
+        db.commit()
 
 
 # ============ CLIENTS CRUD ============
@@ -88,12 +130,18 @@ def get_client(client_id: int, db: Session = Depends(get_db), current_user: User
 @router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
 def create_client(data: ClientCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Create a new client with auto-generated ID and calculated costs."""
+    # Verify plan exists
     plan = db.query(Plan).filter(Plan.id == data.plan_id).first()
     if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
 
+    # Calculate monthly cost from plan
     monthly_cost = plan.monthly_price
+
+    # Calculate annual cost based on contract month
     annual_cost = _calculate_annual_cost(data.contract_date, monthly_cost)
+
+    # Generate client ID
     client_id_str = _generate_client_id(db)
 
     client = Client(
@@ -117,7 +165,8 @@ def create_client(data: ClientCreate, db: Session = Depends(get_db), current_use
     db.commit()
     db.refresh(client)
 
-    add_history_entry(
+    # Log to history
+    _add_history_entry(
         db, "alta_cliente",
         f"Alta de cliente {client.client_id} - {client.name} - Plan: {plan.name} - ${monthly_cost:.2f}/mes",
         amount=0,
@@ -141,16 +190,19 @@ def update_client(
 
     update_data = data.model_dump(exclude_unset=True)
 
+    # If plan changed, recalculate monthly cost
     if "plan_id" in update_data and update_data["plan_id"] != client.plan_id:
         plan = db.query(Plan).filter(Plan.id == update_data["plan_id"]).first()
         if not plan:
             raise HTTPException(status_code=404, detail="Plan no encontrado")
         client.monthly_cost = plan.monthly_price
 
+    # If contract date changed or plan changed, recalculate annual cost
     contract_date = update_data.get("contract_date", client.contract_date)
     if "plan_id" in update_data or "contract_date" in update_data:
         client.annual_cost = _calculate_annual_cost(contract_date, client.monthly_cost)
 
+    # Apply remaining updates
     for key, value in update_data.items():
         if key not in ("plan_id",):
             setattr(client, key, value)
@@ -158,7 +210,37 @@ def update_client(
     db.commit()
     db.refresh(client)
 
-    add_history_entry(
+    # Send SMS notification if status changed to 'suspendido' (fire-and-forget)
+    if "status" in update_data and update_data["status"] == "suspendido":
+        try:
+            from ..sms_client import get_sms_client, format_message
+
+            sms_client = get_sms_client()
+            suspension_enabled = db.query(Setting).filter(Setting.key == "sms_suspension_enabled").first()
+
+            if sms_client and suspension_enabled and suspension_enabled.value.lower() == "true":
+                if client.phone:
+                    msg_setting = db.query(Setting).filter(Setting.key == "sms_message_suspension").first()
+                    template = msg_setting.value if msg_setting else "Su servicio ha sido suspendido por falta de pago."
+
+                    plan = db.query(Plan).filter(Plan.id == client.plan_id).first() if client.plan_id else None
+
+                    message = format_message(template, {
+                        "name": client.name,
+                        "phone": client.phone,
+                        "monthly_cost": client.monthly_cost,
+                        "plan_name": plan.name if plan else "",
+                        "plan_speed": plan.speed if plan else "",
+                        "status": client.status,
+                    })
+
+                    import asyncio
+                    asyncio.create_task(sms_client.send(client.phone, message))
+        except Exception as e:
+            print(f"SMS suspension notification failed: {e}")
+
+    # Log to history
+    _add_history_entry(
         db, "edicion",
         f"Edición de cliente {client.client_id} - {client.name}",
         amount=0,
@@ -178,7 +260,7 @@ def delete_client(client_id: int, db: Session = Depends(get_db), current_user: U
     client.is_active = False
     db.commit()
 
-    add_history_entry(
+    _add_history_entry(
         db, "eliminacion",
         f"Eliminación de cliente {client.client_id} - {client.name}",
         amount=0,
@@ -213,12 +295,13 @@ def record_payment(
 ):
     """
     Record a payment for a client.
-    Automatically creates cash movement and history entry.
+    Automatically updates cash funds, creates history entry.
     """
     client = db.query(Client).filter(Client.id == client_id, Client.is_active == True).first()
     if not client:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
+    # Create payment record
     payment = Payment(
         client_id=client_id,
         date=data.date,
@@ -229,6 +312,7 @@ def record_payment(
     )
     db.add(payment)
 
+    # Automatically add to cash as income
     cash_movement = CashMovement(
         date=data.date,
         type="ingreso",
@@ -239,7 +323,8 @@ def record_payment(
     db.add(cash_movement)
     db.commit()
 
-    add_history_entry(
+    # Log to history
+    _add_history_entry(
         db, "pago_cliente",
         f"Pago de {client.client_id} - {client.name}: ${data.amount:.2f} ({data.method})",
         amount=data.amount,
@@ -247,4 +332,36 @@ def record_payment(
     )
 
     db.refresh(payment)
+
+    # Send payment confirmation SMS (fire-and-forget)
+    try:
+        from ..sms_client import get_sms_client, format_message
+        from ..models import Setting
+
+        sms_client = get_sms_client()
+        payment_enabled_setting = db.query(Setting).filter(Setting.key == "sms_payment_enabled").first()
+
+        if sms_client and payment_enabled_setting and payment_enabled_setting.value.lower() == "true":
+            # Get plan info
+            plan = db.query(Plan).filter(Plan.id == client.plan_id).first() if client.plan_id else None
+
+            # Get message template
+            msg_setting = db.query(Setting).filter(Setting.key == "sms_message_payment").first()
+            template = msg_setting.value if msg_setting else "Hemos recibido su pago de ${monto}. Gracias."
+
+            # Format message
+            message = format_message(template, {
+                "name": client.name,
+                "phone": client.phone,
+                "monthly_cost": client.monthly_cost,
+                "plan_name": plan.name if plan else "",
+                "plan_speed": plan.speed if plan else "",
+            })
+
+            # Send (fire-and-forget)
+            import asyncio
+            asyncio.create_task(sms_client.send(client.phone, message))
+    except Exception as e:
+        print(f"SMS payment confirmation failed: {e}")
+
     return payment

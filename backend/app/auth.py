@@ -104,4 +104,26 @@ def init_default_settings(db: Session):
         if existing is None:
             setting = Setting(key=key, value=value)
             db.add(setting)
+
+    # SMS Notification Settings
+    sms_defaults = {
+        "sms_enabled": "false",
+        "sms_url": "http://localhost:3000",
+        "sms_api_key": "",
+        "sms_reminders_enabled": "false",
+        "sms_cutoff_enabled": "false",
+        "sms_suspension_enabled": "false",
+        "sms_payment_enabled": "false",
+        "sms_reminder_days": "3",
+        "sms_message_reminder": "Estimado {nombre}, le recordamos que su pago de ${monto} vence el día {fecha_corte}. Tiene {dias_restantes} días para regularizar. Su plan: {plan} ({velocidad}).",
+        "sms_message_cutoff": "{nombre}, su servicio será cortado mañana por falta de pago. Monto: ${monto}. Plan: {plan} ({velocidad}). Para evitar la suspensión, realice su pago hoy.",
+        "sms_message_suspension": "{nombre}, su servicio ha sido suspendido por falta de pago. Monto adeudado: ${monto}. Plan: {plan} ({velocidad}). Para reactivar su servicio, contacte atención al cliente.",
+        "sms_message_payment": "{nombre}, hemos recibido su pago de ${monto}. Su servicio está activo. Gracias por su preferencia.",
+    }
+    for key, value in sms_defaults.items():
+        existing = db.query(Setting).filter(Setting.key == key).first()
+        if existing is None:
+            setting = Setting(key=key, value=value)
+            db.add(setting)
+
     db.commit()
