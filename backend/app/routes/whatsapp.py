@@ -385,3 +385,43 @@ async def update_automation_settings(data: AutomationSettings, db: Session = Dep
     """Update WhatsApp automation settings."""
     _save_automation_settings(db, data)
     return _get_automation_settings(db)
+
+
+# ============ QR AND LOGOUT ============
+
+@router.get("/qr")
+async def get_qr(current_user: User = Depends(get_current_user)):
+    """Get the WhatsApp QR code for scanning."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{WHATSAPP_SERVICE_URL}/qr")
+            if response.status_code == 200:
+                data = response.json()
+                # The WhatsApp service returns {qr: '...'} or {status: 'connected'}
+                if "qr" in data and data["qr"]:
+                    return {"qr": data["qr"], "connected": False}
+                elif data.get("status") == "connected" or data.get("isReady"):
+                    return {"qr": None, "connected": True, "message": "Already authenticated"}
+                else:
+                    return {"qr": None, "connected": False, "message": "No QR available yet"}
+    except httpx.RequestError:
+        pass
+
+    return {"qr": None, "connected": False, "message": "WhatsApp service unavailable"}
+
+
+@router.post("/logout")
+async def logout_whatsapp(current_user: User = Depends(get_current_user)):
+    """Disconnect WhatsApp session."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(f"{WHATSAPP_SERVICE_URL}/logout")
+            if response.status_code == 200:
+                return {"success": True, "message": "Sesión de WhatsApp cerrada"}
+            else:
+                return {"success": False, "message": "Error al cerrar sesión"}
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"WhatsApp service no disponible: {str(e)}",
+        )

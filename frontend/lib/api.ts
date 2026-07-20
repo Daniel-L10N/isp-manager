@@ -215,6 +215,13 @@ class ApiClient {
     this.request<any>('/api/settings/', { method: 'PUT', body: data });
 
   // WhatsApp
+  getWhatsAppQR = () =>
+    this.request<{ qr: string | null; connected: boolean; message?: string }>("/api/whatsapp/qr");
+
+  logoutWhatsApp = () =>
+    this.request<{ success: boolean; message: string }>("/api/whatsapp/logout", { method: "POST" });
+
+
   getWhatsAppStatus = () =>
     this.request<{ connected: boolean; phone?: string; name?: string }>('/api/whatsapp/status');
 

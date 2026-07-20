@@ -7,6 +7,7 @@ import {
   MessageSquare, Phone, Clock, Send, CheckCircle, XCircle, Wifi, WifiOff,
 } from 'lucide-react';
 import NotificationSettings from '@/components/NotificationSettings';
+import WhatsAppQR from '@/components/WhatsAppQR';
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -25,11 +26,7 @@ export default function SettingsPage() {
   });
 
   // WhatsApp settings
-  const [whatsappStatus, setWhatsappStatus] = useState<{
-    connected: boolean;
-    phone?: string;
-    name?: string;
-  } | null>(null);
+  const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [automation, setAutomation] = useState({
     reminder_days_before: 3,
     reminder_enabled: true,
@@ -51,15 +48,6 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const fetchWhatsAppStatus = useCallback(async () => {
-    try {
-      const status = await api.getWhatsAppStatus();
-      setWhatsappStatus(status);
-    } catch {
-      setWhatsappStatus({ connected: false });
-    }
-  }, []);
-
   const fetchAutomation = useCallback(async () => {
     try {
       const data = await api.getAutomationSettings();
@@ -71,9 +59,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchSettings();
-    fetchWhatsAppStatus();
     fetchAutomation();
-  }, [fetchSettings, fetchWhatsAppStatus, fetchAutomation]);
+  }, [fetchSettings, fetchAutomation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +106,7 @@ export default function SettingsPage() {
     setError('');
 
     try {
-      const result = await api.sendWhatsAppMessage({
+      await api.sendWhatsAppMessage({
         phone: testPhone.trim(),
         message: `Hola! Este es un mensaje de prueba de ISP Manager.\n\nSi recibes esto, el servicio de WhatsApp está funcionando correctamente.`,
       });
@@ -166,6 +153,17 @@ export default function SettingsPage() {
           {success}
         </div>
       )}
+
+      {/* WhatsApp QR & Connection */}
+      <div className="bg-white rounded-xl card-shadow p-6 space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <MessageSquare className="w-5 h-5 text-gray-400" />
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+            WhatsApp - Conexión
+          </h3>
+        </div>
+        <WhatsAppQR onStatusChange={setWhatsappConnected} />
+      </div>
 
       {/* Company Settings Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-xl card-shadow p-6 space-y-6">
@@ -277,47 +275,13 @@ export default function SettingsPage() {
         </div>
       </form>
 
-      {/* WhatsApp / Automatizaciones Section */}
+      {/* WhatsApp Automations Section */}
       <div className="bg-white rounded-xl card-shadow p-6 space-y-6">
         <div className="flex items-center gap-2 mb-2">
           <MessageSquare className="w-5 h-5 text-gray-400" />
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Automatizaciones - WhatsApp
           </h3>
-        </div>
-
-        {/* Connection Status */}
-        <div className={`p-4 rounded-lg border ${
-          whatsappStatus?.connected
-            ? 'bg-emerald-50 border-emerald-200'
-            : 'bg-red-50 border-red-200'
-        }`}>
-          <div className="flex items-center gap-3">
-            {whatsappStatus?.connected ? (
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
-            ) : (
-              <XCircle className="w-5 h-5 text-red-600" />
-            )}
-            <div>
-              <p className={`text-sm font-medium ${
-                whatsappStatus?.connected ? 'text-emerald-800' : 'text-red-800'
-              }`}>
-                {whatsappStatus?.connected
-                  ? 'WhatsApp Conectado'
-                  : 'WhatsApp Desconectado'}
-              </p>
-              {whatsappStatus?.connected && whatsappStatus.phone && (
-                <p className="text-xs text-emerald-600 mt-0.5">
-                  Número: {whatsappStatus.phone} | Nombre: {whatsappStatus.name || 'N/A'}
-                </p>
-              )}
-              {!whatsappStatus?.connected && (
-                <p className="text-xs text-red-600 mt-0.5">
-                  Escanea el código QR en http://10.0.25.2:8081 para conectar
-                </p>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Automation Settings */}
@@ -420,7 +384,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleSendTest}
-              disabled={sendingTest || !whatsappStatus?.connected}
+              disabled={sendingTest || !whatsappConnected}
               className="btn-primary"
             >
               {sendingTest ? (
@@ -435,7 +399,7 @@ export default function SettingsPage() {
             <p className="text-sm text-emerald-600 mt-2">{testResult}</p>
           )}
 
-          {!whatsappStatus?.connected && (
+          {!whatsappConnected && (
             <p className="text-xs text-red-500 mt-2">
               Conecta WhatsApp primero para enviar mensajes de prueba
             </p>
@@ -456,7 +420,6 @@ export default function SettingsPage() {
           <p>Base de datos: SQLite (local)</p>
           <p>Los datos se almacenan localmente en el servidor</p>
           <p>WhatsApp Service: Puerto 3001 (localhost)</p>
-          <p>QR Page: Puerto 8081 (nginx)</p>
         </div>
       </div>
     </div>
