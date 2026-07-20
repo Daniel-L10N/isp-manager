@@ -123,8 +123,9 @@ app.post("/send", async (req, res) => {
     }
 
     const result = await client.sendMessage(chatId, message);
+    console.log("Send result type:", typeof result, "keys:", result ? Object.keys(result) : "null");
     console.log("Message sent to:", phone);
-    res.json({ success: true, id: result.id });
+    res.json({ success: true, id: result?.id || result?._serialized || "sent" });
   } catch (err) {
     console.error("Send error:", err.message);
     res.status(500).json({ error: err.message });
@@ -151,7 +152,8 @@ app.post("/send-bulk", async (req, res) => {
         chatId = chatId + "@c.us";
       }
       const result = await client.sendMessage(chatId, message);
-      results.push({ phone, success: true, id: result.id });
+    console.log("Send result type:", typeof result, "keys:", result ? Object.keys(result) : "null");
+      results.push({ phone, success: true, id: result?.id || result?._serialized || "sent" });
       // Delay between messages to avoid rate limiting
       await new Promise((r) => setTimeout(r, 2000));
     } catch (err) {

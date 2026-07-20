@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp QR - JARVIS</title>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -21,8 +21,10 @@
             background: white; border-radius: 1rem; padding: 2rem;
             display: inline-block; margin: 1rem 0;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            min-width: 290px; min-height: 290px;
+            display: flex; align-items: center; justify-content: center;
         }
-        #qr-container canvas { display: block; }
+        #qr-container img, #qr-container canvas { display: block; margin: 0 auto; }
         .status { 
             margin-top: 1.5rem; padding: 1rem 2rem; border-radius: 0.5rem;
             font-weight: 600;
@@ -37,6 +39,8 @@
         .instructions ol { text-align: left; padding-left: 1.5rem; }
         .instructions li { margin: 0.5rem 0; }
         .name { color: #22d3ee; font-weight: bold; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top: 4px solid #22d3ee; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -46,7 +50,7 @@
         <p class="subtitle">ISP Manager - Asistente Virtual</p>
         
         <div id="qr-container">
-            <div id="qr"></div>
+            <div class="spinner" id="spinner"></div>
         </div>
         
         <div id="status" class="status loading">Conectando...</div>
@@ -57,41 +61,55 @@
                 <li>Abre WhatsApp en tu celular</li>
                 <li>Ve a <strong>Dispositivos vinculados</strong></li>
                 <li>Toca <strong>Vincular dispositivo</strong></li>
-                <li>Escanea el código QR de arriba</li>
+                <li>Escanea el codigo QR de arriba</li>
             </ol>
         </div>
     </div>
 
     <script>
+        let lastQR = '';
+        let qrElement = null;
+
         async function checkStatus() {
             try {
-                const res = await fetch("/status");
+                const res = await fetch('/whatsapp/status');
                 const data = await res.json();
-                const statusEl = document.getElementById("status");
+                const statusEl = document.getElementById('status');
+                const container = document.getElementById('qr-container');
                 
                 if (data.isReady) {
-                    statusEl.className = "status connected";
-                    statusEl.innerHTML = "✅ Conectado como: " + data.client + " (" + data.phone + ")";
+                    statusEl.className = 'status connected';
+                    statusEl.innerHTML = '✅ Conectado como: ' + data.client + ' (' + data.phone + ')';
+                    container.innerHTML = '<p style="color:#166534;font-size:1.2rem;font-weight:bold">✅ WhatsApp Conectado</p>';
                     return;
                 }
                 
                 if (data.hasQR) {
-                    const qrRes = await fetch("/qr");
+                    const qrRes = await fetch('/whatsapp/qr');
                     const qrData = await qrRes.json();
-                    if (qrData.qr) {
-                        document.getElementById("qr").innerHTML = "";
-                        QRCode.toCanvas(document.createElement("canvas"), qrData.qr, {
+                    if (qrData.qr && qrData.qr !== lastQR) {
+                        lastQR = qrData.qr;
+                        container.innerHTML = '';
+                        qrElement = new QRCode(container, {
+                            text: qrData.qr,
                             width: 256,
-                            margin: 2
-                        }, (err, canvas) => {
-                            if (!err) document.getElementById("qr").appendChild(canvas);
+                            height: 256,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.M
                         });
-                        statusEl.className = "status loading";
-                        statusEl.textContent = "Escanea el código QR con tu celular";
+                        statusEl.className = 'status loading';
+                        statusEl.textContent = 'Escanea el codigo QR con tu celular';
                     }
+                } else {
+                    document.getElementById('spinner').style.display = 'block';
+                    statusEl.className = 'status loading';
+                    statusEl.textContent = 'Generando codigo QR...';
                 }
             } catch (e) {
-                console.error(e);
+                console.error('Error:', e);
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').textContent = 'Error de conexion: ' + e.message;
             }
         }
         
