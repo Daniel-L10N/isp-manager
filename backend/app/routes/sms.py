@@ -155,6 +155,9 @@ async def send_sms(
     """Send an immediate SMS message."""
     sms = _get_sms_or_404()
     result = await sms.send(phone=data.phone, message=data.message)
+    # SMS Manager returns nested error: {success: false, error: {code, message}}
+    if not result.get('success') and isinstance(result.get('error'), dict):
+        result['error'] = result['error'].get('message', str(result['error']))
     return SMSSendResponse(**result)
 
 
