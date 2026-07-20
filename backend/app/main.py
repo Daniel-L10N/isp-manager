@@ -37,7 +37,7 @@ def on_startup():
 
 
 # Register route modules
-from app.routes import auth, dashboard, clients, plans, assets, cash, history, settings
+from app.routes import auth, dashboard, clients, plans, assets, cash, history, settings, whatsapp, sms
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
@@ -47,6 +47,8 @@ app.include_router(assets.router, prefix="/api/assets", tags=["Assets"])
 app.include_router(cash.router, prefix="/api/cash", tags=["Cash"])
 app.include_router(history.router, prefix="/api/history", tags=["History"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(whatsapp.router, prefix="/api/whatsapp", tags=["WhatsApp"])
+app.include_router(sms.router, prefix="/api/sms", tags=["SMS"])
 
 
 @app.get("/api/health")

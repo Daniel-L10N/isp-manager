@@ -34,10 +34,8 @@ def _generate_client_id(db: Session) -> str:
 
 
 def _calculate_annual_cost(contract_date: date, monthly_cost: float) -> float:
-    """Calculate annual payment: remaining months in year × monthly cost."""
-    contract_month = contract_date.month
-    remaining_months = 12 - contract_month + 1
-    return remaining_months * monthly_cost
+    """Calculate annual payment: 12 months × monthly cost."""
+    return 12 * monthly_cost
 
 
 def _add_history_entry(
@@ -212,6 +210,35 @@ def update_client(
     db.commit()
     db.refresh(client)
 
+    # Send SMS notification if status changed to 'suspendido' (fire-and-forget)
+    if "status" in update_data and update_data["status"] == "suspendido":
+        try:
+            from ..sms_client import get_sms_client, format_message
+
+            sms_client = get_sms_client()
+            suspension_enabled = db.query(Setting).filter(Setting.key == "sms_suspension_enabled").first()
+
+            if sms_client and suspension_enabled and suspension_enabled.value.lower() == "true":
+                if client.phone:
+                    msg_setting = db.query(Setting).filter(Setting.key == "sms_message_suspension").first()
+                    template = msg_setting.value if msg_setting else "Su servicio ha sido suspendido por falta de pago."
+
+                    plan = db.query(Plan).filter(Plan.id == client.plan_id).first() if client.plan_id else None
+
+                    message = format_message(template, {
+                        "name": client.name,
+                        "phone": client.phone,
+                        "monthly_cost": client.monthly_cost,
+                        "plan_name": plan.name if plan else "",
+                        "plan_speed": plan.speed if plan else "",
+                        "status": client.status,
+                    })
+
+                    import asyncio
+                    asyncio.create_task(sms_client.send(client.phone, message))
+        except Exception as e:
+            print(f"SMS suspension notification failed: {e}")
+
     # Log to history
     _add_history_entry(
         db, "edicion",
@@ -305,4 +332,36 @@ def record_payment(
     )
 
     db.refresh(payment)
+
+    # Send payment confirmation SMS (fire-and-forget)
+    try:
+        from ..sms_client import get_sms_client, format_message
+        from ..models import Setting
+
+        sms_client = get_sms_client()
+        payment_enabled_setting = db.query(Setting).filter(Setting.key == "sms_payment_enabled").first()
+
+        if sms_client and payment_enabled_setting and payment_enabled_setting.value.lower() == "true":
+            # Get plan info
+            plan = db.query(Plan).filter(Plan.id == client.plan_id).first() if client.plan_id else None
+
+            # Get message template
+            msg_setting = db.query(Setting).filter(Setting.key == "sms_message_payment").first()
+            template = msg_setting.value if msg_setting else "Hemos recibido su pago de ${monto}. Gracias."
+
+            # Format message
+            message = format_message(template, {
+                "name": client.name,
+                "phone": client.phone,
+                "monthly_cost": client.monthly_cost,
+                "plan_name": plan.name if plan else "",
+                "plan_speed": plan.speed if plan else "",
+            })
+
+            # Send (fire-and-forget)
+            import asyncio
+            asyncio.create_task(sms_client.send(client.phone, message))
+    except Exception as e:
+        print(f"SMS payment confirmation failed: {e}")
+
     return payment

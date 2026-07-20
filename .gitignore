@@ -44,3 +44,17 @@ Thumbs.db
 .DS_Store
 Thumbs.db
 *.swp
+
+# === WhatsApp Service ===
+.wwebjs_auth/
+.wwebjs_auth/**
+
+# === Databases ===
+*.db
+*.db-shm
+*.db-wal
+
+# === SDD/Planning files ===
+openspec/
+tasks.md
+tasks-summary.md
