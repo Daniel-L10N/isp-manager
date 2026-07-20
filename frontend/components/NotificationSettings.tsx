@@ -32,9 +32,18 @@ export default function NotificationSettings() {
 
   const API_BASE = '/isp-manager';
 
+const getToken = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('token');
+    }
+    return null;
+  };
+
 const fetchConfig = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/sms/config`);
+      const res = await fetch(`${API_BASE}/api/sms/config`, {
+        headers: { 'Authorization': `Bearer ${getToken()}` },
+      });
       const data = await res.json();
       if (data.success) {
         setConfig(data.data);
@@ -63,7 +72,7 @@ const fetchConfig = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/sms/config`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
         body: JSON.stringify(config),
       });
       const data = await res.json();
@@ -84,7 +93,7 @@ const fetchConfig = useCallback(async () => {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch(`${API_BASE}/api/sms/test`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/sms/test`, { method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}` } });
       const data = await res.json();
       setTestResult(data.success ? '✅ Conectado' : `❌ ${data.error || data.message}`);
     } catch {

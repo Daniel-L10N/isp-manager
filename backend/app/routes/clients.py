@@ -1,3 +1,4 @@
+import re
 """
 Clients CRUD routes.
 Manages ISP clients, including auto-ID generation, payment tracking, and history logging.
@@ -15,6 +16,26 @@ from app.schemas import (
     ClientCreate, ClientUpdate, ClientResponse, ClientListResponse,
     PaymentCreate, PaymentResponse,
 )
+
+
+def _normalize_phone(phone: str) -> str:
+    """Normalize phone number to WhatsApp format: 521XXXXXXXXXX (13 digits)."""
+    if not phone:
+        return ""
+    digits = re.sub(r'[^0-9]', '', phone)
+    if digits.startswith('00'):
+        digits = digits[2:]
+    # If has 52 prefix with more than 12 digits, strip 52
+    if digits.startswith('52') and len(digits) >= 12:
+        digits = digits[2:]
+    # Remove leading 1 if 11 digits
+    if digits.startswith('1') and len(digits) == 11:
+        digits = digits[1:]
+    # Now should have 10 digits, add 521 prefix
+    if len(digits) == 10:
+        digits = '521' + digits
+    return digits
+
 
 router = APIRouter()
 
@@ -219,7 +240,8 @@ def update_client(
             suspension_enabled = db.query(Setting).filter(Setting.key == "sms_suspension_enabled").first()
 
             if sms_client and suspension_enabled and suspension_enabled.value.lower() == "true":
-                if client.phone:
+                phone_norm = _normalize_phone(client.phone)
+                if phone_norm:
                     msg_setting = db.query(Setting).filter(Setting.key == "sms_message_suspension").first()
                     template = msg_setting.value if msg_setting else "Su servicio ha sido suspendido por falta de pago."
 
@@ -227,15 +249,23 @@ def update_client(
 
                     message = format_message(template, {
                         "name": client.name,
-                        "phone": client.phone,
+                        "phone": phone_norm,
                         "monthly_cost": client.monthly_cost,
                         "plan_name": plan.name if plan else "",
                         "plan_speed": plan.speed if plan else "",
                         "status": client.status,
                     })
 
-                    import asyncio
-                    asyncio.create_task(sms_client.send(client.phone, message))
+                    import httpx as _httpx
+                    try:
+                        with _httpx.Client(timeout=10.0) as _c:
+                            _c.post(
+                                f"{sms_client.base_url}/api/v1/external/messages/send",
+                                headers=sms_client.headers,
+                                json={"phone": phone_norm, "message": message},
+                            )
+                    except Exception:
+                        pass
         except Exception as e:
             print(f"SMS suspension notification failed: {e}")
 
@@ -341,6 +371,7 @@ def record_payment(
         sms_client = get_sms_client()
         payment_enabled_setting = db.query(Setting).filter(Setting.key == "sms_payment_enabled").first()
 
+
         if sms_client and payment_enabled_setting and payment_enabled_setting.value.lower() == "true":
             # Get plan info
             plan = db.query(Plan).filter(Plan.id == client.plan_id).first() if client.plan_id else None
@@ -350,17 +381,25 @@ def record_payment(
             template = msg_setting.value if msg_setting else "Hemos recibido su pago de ${monto}. Gracias."
 
             # Format message
+            phone_norm = _normalize_phone(client.phone)
             message = format_message(template, {
                 "name": client.name,
-                "phone": client.phone,
+                "phone": phone_norm,
                 "monthly_cost": client.monthly_cost,
                 "plan_name": plan.name if plan else "",
                 "plan_speed": plan.speed if plan else "",
             })
 
-            # Send (fire-and-forget)
-            import asyncio
-            asyncio.create_task(sms_client.send(client.phone, message))
+            import httpx as _httpx
+            try:
+                with _httpx.Client(timeout=10.0) as _c:
+                    _c.post(
+                        f"{sms_client.base_url}/api/v1/external/messages/send",
+                        headers=sms_client.headers,
+                        json={"phone": phone_norm, "message": message},
+                    )
+            except Exception:
+                pass
     except Exception as e:
         print(f"SMS payment confirmation failed: {e}")
 
