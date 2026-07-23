@@ -52,7 +52,7 @@ const menuStructure: MenuItem[] = [
     icon: Wallet,
     items: [
       { href: '/incomes', label: 'Ingresos', icon: DollarSign },
-      { href: '/payments', label: 'Pagos', icon: Send },
+      { href: '/payments', label: 'Egresos', icon: Send },
       { href: '/liabilities', label: 'Pasivos', icon: CreditCard },
       { href: '/expenses', label: 'Gastos', icon: Wallet },
       { href: '/utilidad', label: 'Utilidad', icon: TrendingUp },
