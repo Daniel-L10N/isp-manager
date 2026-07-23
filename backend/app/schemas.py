@@ -63,7 +63,6 @@ class ClientBase(BaseModel):
     plan_id: int
     status: str = "activo"
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class ClientCreate(ClientBase):
     pass
@@ -116,7 +115,6 @@ class PaymentBase(BaseModel):
     method: str = "efectivo"  # efectivo, transferencia, tarjeta
     status: str = "pagado"  # pagado, pendiente, vencido
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class PaymentCreate(PaymentBase):
     pass
@@ -144,7 +142,6 @@ class AssetBase(BaseModel):
     category: Optional[str] = ""
     status: str = "bueno"
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class AssetCreate(AssetBase):
     pass
@@ -180,7 +177,6 @@ class CashMovementBase(BaseModel):
     concept: str
     amount: float
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class CashMovementCreate(CashMovementBase):
     type: str = ""  # Auto-set by route (ingreso/egreso)
@@ -247,7 +243,6 @@ class LiabilityBase(BaseModel):
     interest_rate: Optional[float] = None
     status: str = "activo"
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class LiabilityCreate(LiabilityBase):
     pass
@@ -314,7 +309,6 @@ class ExpenseBase(BaseModel):
     payment_day: Optional[int] = None
     start_date: date
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class ExpenseCreate(ExpenseBase):
     pass
@@ -353,7 +347,6 @@ class ExpensePaymentBase(BaseModel):
     method: str = "efectivo"
     concept: Optional[str] = ""
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class ExpensePaymentCreate(ExpensePaymentBase):
     pass
@@ -431,7 +424,6 @@ class IncomeBase(BaseModel):
     concept: Optional[str] = ""
     method: str = "efectivo"
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class IncomeCreate(IncomeBase):
     pass
@@ -459,7 +451,6 @@ class InventoryItemBase(BaseModel):
     unit_cost: float = 0
     location: Optional[str] = ""
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class InventoryItemCreate(InventoryItemBase):
     pass
@@ -494,7 +485,6 @@ class InventoryMovementBase(BaseModel):
     concept: Optional[str] = ""
     reference: Optional[str] = ""
     notes: Optional[str] = ""
-    expense_id: Optional[int] = None
 
 class InventoryMovementCreate(InventoryMovementBase):
     pass
