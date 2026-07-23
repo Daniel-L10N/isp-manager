@@ -41,8 +41,8 @@ def create_asset(data: AssetCreate, db: Session = Depends(get_db), current_user:
 
     add_history_entry(
         db, "compra_bien",
-        f"Registro de bien: {asset.name} - Valor: ${asset.approximate_value:.2f}",
-        amount=asset.approximate_value,
+        f"Registro de bien: {asset.name} - Valor: ${asset.purchase_price:.2f}",
+        amount=asset.purchase_price,
         username=current_user.username,
     )
 
@@ -66,7 +66,7 @@ def update_asset(asset_id: int, data: AssetUpdate, db: Session = Depends(get_db)
     add_history_entry(
         db, "edicion",
         f"Edición de bien: {asset.name}",
-        amount=asset.approximate_value,
+        amount=asset.purchase_price,
         username=current_user.username,
     )
 
@@ -86,7 +86,7 @@ def delete_asset(asset_id: int, db: Session = Depends(get_db), current_user: Use
     add_history_entry(
         db, "eliminacion",
         f"Eliminación de bien: {asset.name}",
-        amount=asset.approximate_value,
+        amount=asset.purchase_price,
         username=current_user.username,
     )
 

@@ -60,10 +60,10 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
         ).scalar()
 
     # Expected yearly income - 12 * expected monthly
-    expected_yearly_income = float(expected_monthly_income) * 12
+    expected_yearly_income = float(expected_monthly_income) * (12 - current_month)
 
     # Total assets value
-    total_assets = db.query(func.coalesce(func.sum(Asset.approximate_value), 0))\
+    total_assets = db.query(func.coalesce(func.sum(Asset.purchase_price * Asset.quantity), 0))\
         .filter(Asset.is_active == True).scalar()
 
     # Total capital

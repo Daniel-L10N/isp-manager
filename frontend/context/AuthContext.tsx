@@ -6,6 +6,8 @@ import api from '@/lib/api';
 interface AuthContextType {
   isAuthenticated: boolean;
   username: string | null;
+  role: string | null;
+  isAdmin: boolean;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
@@ -14,6 +16,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   username: null,
+  role: null,
+  isAdmin: false,
   loading: true,
   login: async () => {},
   logout: () => {},
@@ -22,22 +26,24 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Verify stored token on mount
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
       api.setToken(token);
       api.verifyToken()
-        .then((res) => {
+        .then((res: any) => {
           setIsAuthenticated(true);
           setUsername(res.username);
+          setRole(res.role || 'admin');
         })
         .catch(() => {
           api.setToken(null);
           setIsAuthenticated(false);
           setUsername(null);
+          setRole(null);
         })
         .finally(() => setLoading(false));
     } else {
@@ -50,16 +56,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.setToken(result.access_token);
     setIsAuthenticated(true);
     setUsername(result.username);
+    setRole(result.role || 'admin');
   }, []);
 
   const logout = useCallback(() => {
     api.setToken(null);
     setIsAuthenticated(false);
     setUsername(null);
+    setRole(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, username, loading, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, username, role, isAdmin: role === 'admin', loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

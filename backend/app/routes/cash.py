@@ -1,6 +1,6 @@
 """
 Cash register routes.
-Handles income/expense registration and cash fund tracking.
+Handles income/expense registration, cash fund tracking, and admin deletion.
 All cash is calculated from movements only - no base setting.
 """
 
@@ -11,7 +11,7 @@ from sqlalchemy import func
 from typing import List
 from app.database import get_db
 from app.models import CashMovement, Setting, History, User
-from app.auth import get_current_user
+from app.auth import get_current_user, require_admin
 from app.helpers import add_history_entry
 from app.schemas import CashMovementCreate, CashMovementResponse, CashRegisterResponse
 
@@ -84,3 +84,27 @@ def register_expense(data: CashMovementCreate, db: Session = Depends(get_db), cu
     )
 
     return movement
+
+
+@router.delete("/{movement_id}", status_code=status.HTTP_200_OK)
+def delete_movement(movement_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    """Delete a cash movement. Admin only."""
+    movement = db.query(CashMovement).filter(CashMovement.id == movement_id).first()
+    if not movement:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+
+    concept = movement.concept
+    amount = movement.amount
+    movement_type = movement.type
+
+    db.delete(movement)
+    db.commit()
+
+    add_history_entry(
+        db, "eliminacion",
+        f"Eliminado movimiento {movement_type}: {concept} - ${amount:.2f}",
+        amount=None,
+        username=current_user.username,
+    )
+
+    return {"message": "Movimiento eliminado correctamente"}

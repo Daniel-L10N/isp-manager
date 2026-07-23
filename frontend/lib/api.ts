@@ -77,13 +77,13 @@ class ApiClient {
 
   // Auth
   login = (username: string, password: string) =>
-    this.request<{ access_token: string; token_type: string; username: string }>('/api/auth/login', {
+    this.request<{ access_token: string; token_type: string; username: string; role: string }>('/api/auth/login', {
       method: 'POST',
       body: { username, password },
     });
 
   verifyToken = () =>
-    this.request<{ valid: boolean; username: string }>('/api/auth/verify');
+    this.request<{ valid: boolean; username: string; role: string }>('/api/auth/verify');
 
   // Dashboard
   getDashboard = () =>
@@ -180,9 +180,11 @@ class ApiClient {
 
   registerIncome = (data: any) =>
     this.request<any>('/api/cash/income', { method: 'POST', body: data });
-
   registerExpense = (data: any) =>
     this.request<any>('/api/cash/expense', { method: 'POST', body: data });
+
+  deleteCashMovement = (id: number) =>
+    this.request<{ message: string }>(`/api/cash/${id}`, { method: 'DELETE' });
 
   // History
   getHistory = (params?: { limit?: number; offset?: number; type?: string }) => {
@@ -260,6 +262,146 @@ class ApiClient {
 
   testSMSConnection = () =>
     this.request<any>('/api/sms/test', { method: 'POST' });
+
+  // Liabilities
+  getLiabilities = () =>
+    this.request<any[]>("/api/liabilities/");
+
+  getLiabilitiesSummary = () =>
+    this.request<{ total_debt: number; total_paid: number; total_remaining: number; active_count: number }>("/api/liabilities/summary");
+
+  createLiability = (data: any) =>
+    this.request<any>("/api/liabilities/", { method: "POST", body: data });
+
+  updateLiability = (id: number, data: any) =>
+    this.request<any>("/api/liabilities/" + id, { method: "PUT", body: data });
+
+  deleteLiability = (id: number) =>
+    this.request<{ message: string }>("/api/liabilities/" + id, { method: "DELETE" });
+
+  // Provider Payments (Pagos a Proveedores)
+  getPaymentCreditors = () =>
+    this.request<string[]>('/api/payments/creditors');
+
+  getLiabilitiesByCreditor = (creditor: string) =>
+    this.request<any[]>(`/api/payments/creditor/${encodeURIComponent(creditor)}/liabilities`);
+
+  getProviderPayments = () =>
+    this.request<any[]>('/api/payments/');
+
+  createProviderPayment = (data: any) =>
+    this.request<any>('/api/payments/', { method: 'POST', body: data });
+
+  deleteProviderPayment = (id: number) =>
+    this.request<{ message: string }>(`/api/payments/${id}`, { method: 'DELETE' });
+
+  // Expenses (Gastos Operativos)
+  getExpenses = () =>
+    this.request<any[]>('/api/expenses/');
+
+  getExpensesSummary = () =>
+    this.request<{ total_monthly: number; total_active: number; total_overdue: number; total_paid_year: number; categories: Record<string, number> }>('/api/expenses/summary');
+
+  getExpenseCategories = () =>
+    this.request<string[]>('/api/expenses/categories');
+
+  getExpenseFrequencies = () =>
+    this.request<any[]>('/api/expenses/frequencies');
+
+  createExpense = (data: any) =>
+    this.request<any>('/api/expenses/', { method: 'POST', body: data });
+
+  updateExpense = (id: number, data: any) =>
+    this.request<any>(`/api/expenses/${id}`, { method: 'PUT', body: data });
+
+  deleteExpense = (id: number) =>
+    this.request<{ message: string }>(`/api/expenses/${id}`, { method: 'DELETE' });
+
+  recordExpensePayment = (expenseId: number, data: any) =>
+    this.request<any>(`/api/expenses/${expenseId}/payments`, { method: 'POST', body: data });
+
+  getExpensePayments = (expenseId: number) =>
+    this.request<any[]>(`/api/expenses/${expenseId}/payments`);
+
+  deleteExpensePayment = (paymentId: number) =>
+    this.request<{ message: string }>(`/api/expenses/payments/${paymentId}`, { method: 'DELETE' });
+
+  getUpcomingExpenses = (days: number = 30) =>
+    this.request<any[]>(`/api/expenses/upcoming?days=${days}`);
+
+  // Profit / Utilidad
+  getProfit = (params?: { period?: string; start_date?: string; end_date?: string }) => {
+    let query = '';
+    if (params) {
+      const qs = new URLSearchParams();
+      if (params.period) qs.set('period', params.period);
+      if (params.start_date) qs.set('start_date', params.start_date);
+      if (params.end_date) qs.set('end_date', params.end_date);
+      query = '?' + qs.toString();
+    }
+    return this.request<any>(`/api/profit/${query}`);
+  };
+
+  getMonthlyProfit = (year?: number) => {
+    const q = year ? `?year=${year}` : '';
+    return this.request<any[]>(`/api/profit/monthly${q}`);
+  };
+
+  // Incomes (Ingresos)
+  getIncomes = (params?: { client_id?: number }) => {
+    let q = '';
+    if (params?.client_id) q = `?client_id=${params.client_id}`;
+    return this.request<any[]>(`/api/incomes/${q}`);
+  };
+
+  getIncomeClients = () =>
+    this.request<any[]>('/api/incomes/clients');
+
+  getIncomeSummary = () =>
+    this.request<{ month_total: number; year_total: number; total_all: number; total_records: number }>('/api/incomes/summary');
+
+  createIncome = (data: any) =>
+    this.request<any>('/api/incomes/', { method: 'POST', body: data });
+
+  deleteIncome = (id: number) =>
+    this.request<{ message: string }>(`/api/incomes/${id}`, { method: 'DELETE' });
+
+  // Inventory (Inventario)
+  getInventoryItems = (params?: { search?: string; category?: string; low_stock?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (params?.search) qs.set('search', params.search);
+    if (params?.category) qs.set('category', params.category);
+    if (params?.low_stock) qs.set('low_stock', 'true');
+    const q = qs.toString() ? '?' + qs.toString() : '';
+    return this.request<any[]>(`/api/inventory/${q}`);
+  };
+
+  getInventorySummary = () =>
+    this.request<{ total_items: number; total_stock_value: number; low_stock_count: number; total_movements_today: number }>('/api/inventory/summary');
+
+  getInventoryCategories = () =>
+    this.request<string[]>('/api/inventory/categories');
+
+  getLowStockItems = () =>
+    this.request<any[]>('/api/inventory/low-stock');
+
+  createInventoryItem = (data: any) =>
+    this.request<any>('/api/inventory/', { method: 'POST', body: data });
+
+  updateInventoryItem = (id: number, data: any) =>
+    this.request<any>(`/api/inventory/${id}`, { method: 'PUT', body: data });
+
+  deleteInventoryItem = (id: number) =>
+    this.request<{ message: string }>(`/api/inventory/${id}`, { method: 'DELETE' });
+
+  getInventoryMovements = (itemId: number) =>
+    this.request<any[]>(`/api/inventory/${itemId}/movements`);
+
+  createInventoryMovement = (data: any) =>
+    this.request<any>('/api/inventory/movements', { method: 'POST', body: data });
+
+  deleteInventoryMovement = (id: number) =>
+    this.request<{ message: string }>(`/api/inventory/movements/${id}`, { method: 'DELETE' });
 
   sendSMS = (phone: string, message: string) =>
     this.request<any>('/api/sms/send', { method: 'POST', body: { phone, message } });

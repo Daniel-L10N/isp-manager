@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import AnimatedNumber from '@/components/AnimatedNumber';
 import {
   Wallet,
   TrendingUp,
@@ -13,6 +16,9 @@ import {
   DollarSign,
   ArrowUpRight,
   ArrowDownRight,
+  LogOut,
+  User,
+  RefreshCw,
 } from 'lucide-react';
 
 interface DashboardData {
@@ -45,10 +51,14 @@ function formatCurrency(amount: number, currency: string = 'MXN'): string {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { username, role, logout } = useAuth();
   const [error, setError] = useState('');
+  const [isAuthError, setIsAuthError] = useState(false);
   const [currency, setCurrency] = useState('MXN');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchData = useCallback(async () => {
     try {
@@ -59,19 +69,31 @@ export default function DashboardPage() {
       setData(dashboardData);
       setCurrency(settings.currency || 'MXN');
       setError('');
+      setIsAuthError(false);
     } catch (err: any) {
-      setError(err.message);
+      const msg = err.message || '';
+      const authErr = msg.includes('Token') || msg.includes('inválido') || msg.includes('expirado') || msg.includes('401');
+      setIsAuthError(authErr);
+      setError(msg);
+      if (authErr) {
+        router.replace('/login');
+        return;
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     fetchData();
-    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  const handleRefresh = () => {
+    setRefreshKey((k) => k + 1);
+    fetchData();
+  };
 
   if (loading) {
     return (
@@ -87,8 +109,8 @@ export default function DashboardPage() {
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
           <p className="text-gray-600">{error}</p>
-          <button onClick={fetchData} className="btn-primary mt-4">
-            Reintentar
+          <button onClick={() => router.replace('/login')} className="btn-primary mt-4">
+            Ir al Login
           </button>
         </div>
       </div>
@@ -100,25 +122,33 @@ export default function DashboardPage() {
   const financialCards = [
     {
       title: 'Fondos en Caja',
-      value: formatCurrency(data.cash_funds, currency),
+      rawValue: data.cash_funds,
+      prefix: '$',
+      decimals: 2,
       icon: Wallet,
       color: 'bg-emerald-500',
       bg: 'bg-emerald-50',
       textColor: 'text-emerald-600',
     },
     {
-      title: 'Ingreso Esperado (Mes)',
-      value: formatCurrency(data.expected_monthly_income, currency),
-      subtitle: formatCurrency(data.monthly_income, currency) + ' cobrado',
+      title: 'Ingreso Esperado Mes',
+      rawValue: data.expected_monthly_income,
+      prefix: '$',
+      decimals: 2,
+      subtitleRaw: data.monthly_income,
+      subtitleSuffix: ' cobrado',
       icon: TrendingUp,
       color: 'bg-blue-500',
       bg: 'bg-blue-50',
       textColor: 'text-blue-600',
     },
     {
-      title: 'Ingreso Esperado (Año)',
-      value: formatCurrency(data.expected_yearly_income, currency),
-      subtitle: formatCurrency(data.yearly_income, currency) + ' cobrado',
+      title: 'Ingreso Esperado Resto Año',
+      rawValue: data.expected_yearly_income,
+      prefix: '$',
+      decimals: 2,
+      subtitleRaw: data.yearly_income,
+      subtitleSuffix: ' cobrado',
       icon: Calendar,
       color: 'bg-violet-500',
       bg: 'bg-violet-50',
@@ -126,7 +156,9 @@ export default function DashboardPage() {
     },
     {
       title: 'Valor de Bienes',
-      value: formatCurrency(data.total_assets, currency),
+      rawValue: data.total_assets,
+      prefix: '$',
+      decimals: 2,
       icon: Package,
       color: 'bg-amber-500',
       bg: 'bg-amber-50',
@@ -134,7 +166,9 @@ export default function DashboardPage() {
     },
     {
       title: 'Capital Total',
-      value: formatCurrency(data.total_capital, currency),
+      rawValue: data.total_capital,
+      prefix: '$',
+      decimals: 2,
       icon: Building2,
       color: 'bg-indigo-500',
       bg: 'bg-indigo-50',
@@ -145,7 +179,7 @@ export default function DashboardPage() {
   const clientCards = [
     {
       title: 'Clientes Activos',
-      value: data.active_clients,
+      rawValue: data.active_clients,
       icon: Users,
       color: 'bg-emerald-500',
       bg: 'bg-emerald-50',
@@ -153,7 +187,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Clientes Suspendidos',
-      value: data.suspended_clients,
+      rawValue: data.suspended_clients,
       icon: Users,
       color: 'bg-amber-500',
       bg: 'bg-amber-50',
@@ -161,7 +195,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Clientes Morosos',
-      value: data.delinquent_clients,
+      rawValue: data.delinquent_clients,
       icon: AlertCircle,
       color: 'bg-red-500',
       bg: 'bg-red-50',
@@ -169,7 +203,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Total Clientes',
-      value: data.total_clients,
+      rawValue: data.total_clients,
       icon: Users,
       color: 'bg-primary-500',
       bg: 'bg-primary-50',
@@ -187,9 +221,30 @@ export default function DashboardPage() {
             Resumen general de tu empresa
           </p>
         </div>
-        <button onClick={fetchData} className="btn-secondary text-sm">
-          Actualizar
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={handleRefresh} className="btn-secondary text-sm flex items-center gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" />
+            Actualizar
+          </button>
+          <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
+            <div className="flex items-center gap-2">
+              <div className={`p-2 rounded-lg ${role === 'admin' ? 'bg-amber-50' : 'bg-blue-50'}`}>
+                <User className={`w-4 h-4 ${role === 'admin' ? 'text-amber-600' : 'text-blue-600'}`} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-800">{username}</p>
+                <p className="text-xs text-gray-400">{role === 'admin' ? 'Administrador' : 'Operador'}</p>
+              </div>
+            </div>
+            <button
+              onClick={logout}
+              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Financial Cards */}
@@ -210,11 +265,23 @@ export default function DashboardPage() {
                 {card.title}
               </p>
               <p className="text-lg font-bold text-gray-800 mt-1">
-                {card.value}
+                <AnimatedNumber
+                  key={refreshKey}
+                  value={card.rawValue}
+                  prefix={card.prefix}
+                  decimals={card.decimals}
+                  duration={1200}
+                />
               </p>
-              {(card as any).subtitle && (
+              {(card as any).subtitleRaw !== undefined && (
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {(card as any).subtitle}
+                  <AnimatedNumber
+                    key={refreshKey}
+                    value={(card as any).subtitleRaw}
+                    prefix="$"
+                    decimals={2}
+                    duration={1200}
+                  />{(card as any).subtitleSuffix}
                 </p>
               )}
             </div>
@@ -237,7 +304,14 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">{card.title}</p>
-                  <p className="text-2xl font-bold text-gray-800">{card.value}</p>
+                  <p className="text-2xl font-bold text-gray-800">
+                    <AnimatedNumber
+                      key={refreshKey}
+                      value={card.rawValue}
+                      decimals={0}
+                      duration={1000}
+                    />
+                  </p>
                 </div>
               </div>
             </div>

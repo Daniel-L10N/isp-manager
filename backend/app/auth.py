@@ -2,6 +2,7 @@
 Authentication module.
 Handles JWT token creation, verification, and password hashing.
 Default credentials: admin / L10Nstad
+Second user: trabajo / Trabajo*123 (role: user)
 """
 
 from datetime import datetime, timedelta
@@ -13,28 +14,23 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 
-# Secret key for JWT signing - in production, use environment variable
 SECRET_KEY = "isp-manager-secret-key-change-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
-# Password hashing context using bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 
 def hash_password(password: str) -> str:
-    """Hash a plain text password using bcrypt."""
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain text password against a hashed password."""
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def create_access_token(data: dict) -> str:
-    """Create a JWT access token with expiration."""
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
@@ -42,7 +38,6 @@ def create_access_token(data: dict) -> str:
 
 
 def verify_token(token: str) -> dict:
-    """Verify and decode a JWT token. Returns payload or raises exception."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -58,7 +53,6 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
-    """Dependency to get the current authenticated user from the token."""
     payload = verify_token(credentials.credentials)
     username = payload.get("sub")
     if username is None:
@@ -75,16 +69,36 @@ def get_current_user(
     return user
 
 
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency that requires admin role."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren permisos de administrador",
+        )
+    return current_user
+
+
 def init_default_user(db: Session):
-    """Create default admin user if no users exist."""
+    """Create default users if none exist."""
     user = db.query(User).first()
     if user is None:
-        default_user = User(
+        # Admin user
+        admin_user = User(
             username="admin",
             hashed_password=hash_password("L10Nstad"),
             is_active=True,
+            role="admin",
         )
-        db.add(default_user)
+        db.add(admin_user)
+        # Normal user
+        normal_user = User(
+            username="trabajo",
+            hashed_password=hash_password("Trabajo*123"),
+            is_active=True,
+            role="user",
+        )
+        db.add(normal_user)
         db.commit()
 
 
@@ -105,7 +119,6 @@ def init_default_settings(db: Session):
             setting = Setting(key=key, value=value)
             db.add(setting)
 
-    # SMS Notification Settings
     sms_defaults = {
         "sms_enabled": "false",
         "sms_url": "http://localhost:3000",

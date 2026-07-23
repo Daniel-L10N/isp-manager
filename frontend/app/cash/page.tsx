@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import {
-  Wallet, Plus, X, AlertCircle, Loader2,
-  ArrowUpRight, ArrowDownRight, Calendar, Search,
+  Wallet, Plus, X, AlertCircle, Loader2, Trash2,
+  Calendar, Search,
 } from 'lucide-react';
 
 interface Movement {
@@ -17,6 +18,7 @@ interface Movement {
 }
 
 export default function CashPage() {
+  const { isAdmin } = useAuth();
   const [currentFunds, setCurrentFunds] = useState(0);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +27,7 @@ export default function CashPage() {
   const [modalType, setModalType] = useState<'ingreso' | 'egreso'>('ingreso');
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleting, setDeleting] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -80,6 +83,19 @@ export default function CashPage() {
     }
   };
 
+  const handleDelete = async (movement: Movement) => {
+    if (!confirm(`¿Eliminar movimiento "${movement.concept}" de $${movement.amount.toFixed(2)}?`)) return;
+    setDeleting(movement.id);
+    try {
+      await api.deleteCashMovement(movement.id);
+      await fetchData();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const filteredMovements = movements.filter((m) =>
     m.concept.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.type.toLowerCase().includes(searchTerm.toLowerCase())
@@ -123,18 +139,20 @@ export default function CashPage() {
                 Fondos en Caja
               </p>
             </div>
-            <p className="text-4xl font-bold">${currentFunds.toFixed(2)}</p>
+            <p className="text-4xl font-bold">
+              {currentFunds >= 0 ? '' : '-'}${Math.abs(currentFunds).toFixed(2)}
+            </p>
           </div>
           <div className="flex gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-emerald-300">
-                ${movements.filter((m) => m.type === 'ingreso').reduce((s, m) => s + m.amount, 0).toFixed(2)}
+                +${movements.filter((m) => m.type === 'ingreso').reduce((s, m) => s + m.amount, 0).toFixed(2)}
               </p>
               <p className="text-xs text-primary-200">Total Ingresos</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-red-300">
-                ${movements.filter((m) => m.type === 'egreso').reduce((s, m) => s + m.amount, 0).toFixed(2)}
+                -${movements.filter((m) => m.type === 'egreso').reduce((s, m) => s + m.amount, 0).toFixed(2)}
               </p>
               <p className="text-xs text-primary-200">Total Egresos</p>
             </div>
@@ -175,6 +193,7 @@ export default function CashPage() {
                     <th>Concepto</th>
                     <th>Monto</th>
                     <th>Notas</th>
+                    {isAdmin && <th>Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -198,6 +217,22 @@ export default function CashPage() {
                         </span>
                       </td>
                       <td className="text-sm text-gray-500">{movement.notes || '—'}</td>
+                      {isAdmin && (
+                        <td>
+                          <button
+                            onClick={() => handleDelete(movement)}
+                            disabled={deleting === movement.id}
+                            className="btn-ghost text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
+                            title="Eliminar movimiento"
+                          >
+                            {deleting === movement.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

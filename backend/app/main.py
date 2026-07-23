@@ -45,7 +45,7 @@ def on_shutdown():
 
 
 # Register route modules
-from app.routes import auth, dashboard, clients, plans, assets, cash, history, settings, whatsapp, sms
+from app.routes import auth, dashboard, clients, plans, assets, cash, history, settings, whatsapp, sms, liabilities, provider_payments, expenses, profit, incomes, inventory
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
@@ -57,6 +57,12 @@ app.include_router(history.router, prefix="/api/history", tags=["History"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(whatsapp.router, prefix="/api/whatsapp", tags=["WhatsApp"])
 app.include_router(sms.router, prefix="/api/sms", tags=["SMS"])
+app.include_router(liabilities.router, prefix="/api/liabilities", tags=["Liabilities"])
+app.include_router(provider_payments.router, prefix="/api/payments", tags=["ProviderPayments"])
+app.include_router(expenses.router, prefix="/api/expenses", tags=["Expenses"])
+app.include_router(profit.router, prefix="/api/profit", tags=["Profit"])
+app.include_router(incomes.router, prefix="/api/incomes", tags=["Incomes"])
+app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 
 
 @app.get("/api/health")
