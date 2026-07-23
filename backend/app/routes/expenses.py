@@ -95,10 +95,11 @@ def get_summary(db: Session = Depends(get_db), current_user: User = Depends(get_
     categories = {}
     for e in expenses:
         months = FREQUENCY_MONTHS.get(e.frequency, 1)
-        monthly_equiv = e.amount / months
-        total_monthly += monthly_equiv
-        cat = e.category or "Sin categoría"
-        categories[cat] = categories.get(cat, 0) + monthly_equiv
+        if months > 0:
+            monthly_equiv = e.amount / months
+            total_monthly += monthly_equiv
+            cat = e.category or "Sin categoría"
+            categories[cat] = categories.get(cat, 0) + monthly_equiv
 
     overdue_count = sum(1 for e in expenses if is_overdue(calc_next_due(e.start_date, e.last_paid_date, e.frequency)))
 
