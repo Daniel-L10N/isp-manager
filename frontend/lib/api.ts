@@ -286,6 +286,9 @@ class ApiClient {
   getLiabilitiesByCreditor = (creditor: string) =>
     this.request<any[]>(`/api/payments/creditor/${encodeURIComponent(creditor)}/liabilities`);
 
+  getExpensesByCreditor = (creditor: string) =>
+    this.request<any[]>(`/api/payments/creditor/${encodeURIComponent(creditor)}/expenses`);
+
   getProviderPayments = () =>
     this.request<any[]>('/api/payments/');
 

@@ -5,7 +5,7 @@ import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import {
   Plus, Trash2, Receipt, X, AlertCircle, Loader2, Search,
-  DollarSign, CheckCircle, CreditCard, Send,
+  DollarSign, CheckCircle, CreditCard, Send, Link2,
 } from 'lucide-react';
 
 interface ProviderPayment {
@@ -18,6 +18,7 @@ interface ProviderPayment {
   method: string;
   status: string;
   notes: string;
+  expense_id: number | null;
   created_at: string;
 }
 
@@ -31,6 +32,15 @@ interface LiabilityOption {
   status: string;
 }
 
+interface ExpenseOption {
+  id: number;
+  concept: string;
+  category: string;
+  amount: number;
+  frequency: string;
+  last_paid_date: string | null;
+}
+
 export default function PaymentsPage() {
   const { isAdmin } = useAuth();
   const [payments, setPayments] = useState<ProviderPayment[]>([]);
@@ -41,16 +51,18 @@ export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [deleting, setDeleting] = useState<number | null>(null);
 
-  // Creditor / Liability selectors
+  // Creditor / Liability / Expense selectors
   const [creditors, setCreditors] = useState<string[]>([]);
   const [selectedCreditor, setSelectedCreditor] = useState('');
   const [liabilityOptions, setLiabilityOptions] = useState<LiabilityOption[]>([]);
-  const [loadingLiabilities, setLoadingLiabilities] = useState(false);
+  const [expenseOptions, setExpenseOptions] = useState<ExpenseOption[]>([]);
+  const [loadingLinked, setLoadingLinked] = useState(false);
 
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     creditor: '',
     liability_id: null as number | null,
+    expense_id: null as number | null,
     amount: 0,
     concept: '',
     method: 'efectivo',
@@ -77,17 +89,21 @@ export default function PaymentsPage() {
     fetchData();
   }, [fetchData]);
 
-  // Load liabilities when creditor changes
+  // Load liabilities + expenses when creditor changes
   useEffect(() => {
     if (!selectedCreditor) {
       setLiabilityOptions([]);
+      setExpenseOptions([]);
       return;
     }
-    setLoadingLiabilities(true);
-    api.getLiabilitiesByCreditor(selectedCreditor)
-      .then(setLiabilityOptions)
-      .catch(() => setLiabilityOptions([]))
-      .finally(() => setLoadingLiabilities(false));
+    setLoadingLinked(true);
+    Promise.all([
+      api.getLiabilitiesByCreditor(selectedCreditor).catch(() => []),
+      api.getExpensesByCreditor(selectedCreditor).catch(() => []),
+    ]).then(([liabs, exps]) => {
+      setLiabilityOptions(liabs);
+      setExpenseOptions(exps);
+    }).finally(() => setLoadingLinked(false));
   }, [selectedCreditor]);
 
   const openCreateModal = () => {
@@ -95,6 +111,7 @@ export default function PaymentsPage() {
       date: new Date().toISOString().split('T')[0],
       creditor: '',
       liability_id: null,
+      expense_id: null,
       amount: 0,
       concept: '',
       method: 'efectivo',
@@ -103,12 +120,23 @@ export default function PaymentsPage() {
     });
     setSelectedCreditor('');
     setLiabilityOptions([]);
+    setExpenseOptions([]);
     setShowModal(true);
   };
 
   const handleCreditorChange = (creditor: string) => {
     setSelectedCreditor(creditor);
-    setForm({ ...form, creditor, liability_id: null });
+    setForm({ ...form, creditor, liability_id: null, expense_id: null });
+  };
+
+  const handleExpenseSelect = (expenseId: number) => {
+    const exp = expenseOptions.find((e) => e.id === expenseId);
+    setForm({
+      ...form,
+      expense_id: expenseId || null,
+      amount: exp ? exp.amount : form.amount,
+      concept: exp ? exp.concept : form.concept,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,7 +155,7 @@ export default function PaymentsPage() {
   };
 
   const handleDelete = async (p: ProviderPayment) => {
-    if (!confirm(`¿Eliminar pago a "${p.creditor}" por $${p.amount}?`)) return;
+    if (!confirm(`Eliminar pago a "${p.creditor}" por $${p.amount}?`)) return;
     setDeleting(p.id);
     try {
       await api.deleteProviderPayment(p.id);
@@ -171,12 +199,12 @@ export default function PaymentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Pagos a Proveedores</h1>
-          <p className="text-sm text-gray-500 mt-1">Registra pagos realizados a proveedores y acreedores</p>
+          <h1 className="text-2xl font-bold text-gray-800">Egresos</h1>
+          <p className="text-sm text-gray-500 mt-1">Registra pagos a proveedores, vinculados a pasivos y gastos</p>
         </div>
         <button onClick={openCreateModal} className="btn-primary">
           <Plus className="w-4 h-4" />
-          Nuevo Pago
+          Nuevo Egreso
         </button>
       </div>
 
@@ -188,8 +216,8 @@ export default function PaymentsPage() {
               <DollarSign className="w-6 h-6 text-emerald-500" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase font-medium">Total Pagado</p>
-              <p className="text-xl font-bold text-emerald-600">{fmt(totalPaid)}</p>
+              <p className="text-xs text-gray-500 uppercase font-medium">Total Egresos</p>
+              <p className="text-xl font-bold text-red-600">{fmt(totalPaid)}</p>
             </div>
           </div>
         </div>
@@ -222,7 +250,7 @@ export default function PaymentsPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           type="text"
-          placeholder="Buscar pagos..."
+          placeholder="Buscar egresos..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10 pr-4 w-full"
@@ -240,7 +268,8 @@ export default function PaymentsPage() {
                 <th>Concepto</th>
                 <th>Monto</th>
                 <th>Método</th>
-                <th>Pasivo Vinculado</th>
+                <th>Pasivo</th>
+                <th>Gasto</th>
                 <th>Estado</th>
                 {isAdmin && <th>Acciones</th>}
               </tr>
@@ -256,6 +285,15 @@ export default function PaymentsPage() {
                   <td className="text-sm">
                     {p.liability_id ? (
                       <span className="badge-info">#{p.liability_id}</span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="text-sm">
+                    {p.expense_id ? (
+                      <span className="badge-success flex items-center gap-1">
+                        <Link2 className="w-3 h-3" />#{p.expense_id}
+                      </span>
                     ) : (
                       <span className="text-gray-400">—</span>
                     )}
@@ -278,11 +316,11 @@ export default function PaymentsPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 8 : 7} className="text-center py-12 text-gray-400">
+                  <td colSpan={isAdmin ? 9 : 8} className="text-center py-12 text-gray-400">
                     <Receipt className="w-12 h-12 mx-auto mb-3" />
-                    <p className="text-sm">No hay pagos registrados</p>
+                    <p className="text-sm">No hay egresos registrados</p>
                     <button onClick={openCreateModal} className="btn-primary mt-4">
-                      Registrar primer pago
+                      Registrar primer egreso
                     </button>
                   </td>
                 </tr>
@@ -297,7 +335,7 @@ export default function PaymentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-800">Nuevo Pago a Proveedor</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Nuevo Egreso</h2>
               <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
                 <X className="w-5 h-5 text-gray-400" />
               </button>
@@ -347,10 +385,38 @@ export default function PaymentsPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  Los acreedores provienen de los pasivos registrados
-                </p>
               </div>
+
+              {/* Linked Expense */}
+              {selectedCreditor && !loadingLinked && expenseOptions.length > 0 && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <label className="block text-sm font-medium text-green-700 mb-1 flex items-center gap-1">
+                    <Link2 className="w-4 h-4" />
+                    Vincular a Gasto Recurrente (opcional)
+                  </label>
+                  <select
+                    value={form.expense_id || ''}
+                    onChange={(e) => handleExpenseSelect(e.target.value ? Number(e.target.value) : 0)}
+                    className="w-full"
+                  >
+                    <option value="">Sin vincular a gasto</option>
+                    {expenseOptions.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.concept} — {fmt(e.amount)}/{e.frequency}
+                        {e.last_paid_date ? ` (ult. pago: ${e.last_paid_date})` : ' (sin pagar)'}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-green-600 mt-1">
+                    Se creara un registro de pago en Gastos automaticamente
+                  </p>
+                </div>
+              )}
+              {selectedCreditor && !loadingLinked && expenseOptions.length === 0 && (
+                <p className="text-xs text-gray-400">No hay gastos recurrentes para este proveedor</p>
+              )}
+
+              {/* Linked Liability */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Vincular a Pasivo (opcional)
@@ -358,7 +424,7 @@ export default function PaymentsPage() {
                 <select
                   value={form.liability_id || ''}
                   onChange={(e) => setForm({ ...form, liability_id: e.target.value ? Number(e.target.value) : null })}
-                  disabled={!selectedCreditor || loadingLiabilities}
+                  disabled={!selectedCreditor || loadingLinked}
                   className="w-full"
                 >
                   <option value="">Sin vincular</option>
@@ -368,13 +434,11 @@ export default function PaymentsPage() {
                     </option>
                   ))}
                 </select>
-                {loadingLiabilities && (
-                  <p className="text-xs text-gray-400 mt-1">Cargando pasivos...</p>
-                )}
-                {selectedCreditor && !loadingLiabilities && liabilityOptions.length === 0 && (
-                  <p className="text-xs text-amber-500 mt-1">No hay pasivos activos para este acreedor</p>
+                {loadingLinked && (
+                  <p className="text-xs text-gray-400 mt-1">Cargando datos vinculados...</p>
                 )}
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Concepto</label>
@@ -387,7 +451,7 @@ export default function PaymentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pago</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Metodo de Pago</label>
                   <select
                     value={form.method}
                     onChange={(e) => setForm({ ...form, method: e.target.value })}
@@ -418,7 +482,7 @@ export default function PaymentsPage() {
                   {saving ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Registrando...</>
                   ) : (
-                    <><Send className="w-4 h-4" /> Registrar Pago</>
+                    <><Send className="w-4 h-4" /> Registrar Egreso</>
                   )}
                 </button>
               </div>
