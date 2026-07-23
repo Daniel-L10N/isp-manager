@@ -58,9 +58,24 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
             Client.status == "activo",
         ).scalar()
 
-    # Expected yearly income - remaining months * expected monthly
+    # Expected yearly income - promedio de meses anteriores * meses restantes
+    if current_month > 1:
+        # Get total income from months 1 to (current_month - 1)
+        prev_income = db.query(func.coalesce(func.sum(Income.amount), 0)).filter(
+            func.extract("year", Income.date) == current_year,
+            func.extract("month", Income.date) < current_month,
+        ).scalar()
+        avg_monthly = float(prev_income) / (current_month - 1)
+    else:
+        # First month - no previous data, use expected from clients
+        avg_monthly = float(expected_monthly_income)
+
+    # If no real income yet, fall back to client expected
+    if avg_monthly <= 0:
+        avg_monthly = float(expected_monthly_income)
+
     months_remaining = 12 - current_month
-    expected_yearly_income = float(expected_monthly_income) * months_remaining
+    expected_yearly_income = avg_monthly * months_remaining
 
     # Total assets value
     total_assets = db.query(func.coalesce(func.sum(Asset.purchase_price * Asset.quantity), 0))\
