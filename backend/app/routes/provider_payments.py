@@ -21,11 +21,16 @@ router = APIRouter()
 
 @router.get("/creditors", response_model=List[str])
 def get_creditors(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Get unique creditor names from active liabilities."""
+    """Get unique creditor names from liabilities + expense providers."""
     creditors = db.query(distinct(Liability.creditor))\
         .filter(Liability.is_active == True, Liability.creditor != None, Liability.creditor != "")\
         .order_by(Liability.creditor).all()
-    return [c[0] for c in creditors]
+    # Also get providers from expenses
+    expense_providers = db.query(distinct(Expense.provider))\
+        .filter(Expense.is_active == True, Expense.provider != None, Expense.provider != "")\
+        .order_by(Expense.provider).all()
+    all_names = set([c[0] for c in creditors] + [p[0] for p in expense_providers])
+    return sorted(all_names)
 
 
 @router.get("/creditor/{creditor}/liabilities")
