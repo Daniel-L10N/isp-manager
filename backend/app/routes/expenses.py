@@ -28,11 +28,14 @@ FREQUENCY_MONTHS = {
     "semestral": 6,
     "anual": 12,
     "18meses": 18,
+    "unico_pago": 0,
 }
 
 
 def calc_next_due(start_date: date, last_paid_date: date | None, frequency: str) -> date | None:
     """Calculate the next due date based on frequency."""
+    if frequency == "unico_pago":
+        return None if last_paid_date else start_date
     months = FREQUENCY_MONTHS.get(frequency, 1)
     base = last_paid_date or start_date
     next_due = base + relativedelta(months=months)
@@ -141,6 +144,7 @@ def get_frequencies():
         {"value": "semestral", "label": "Semestral (cada 6 meses)", "months": 6},
         {"value": "anual", "label": "Anual", "months": 12},
         {"value": "18meses", "label": "Cada 18 meses", "months": 18},
+        {"value": "unico_pago", "label": "Unico Pago", "months": 0},
     ]
 
 
