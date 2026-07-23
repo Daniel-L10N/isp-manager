@@ -1,6 +1,7 @@
 """
 Provider payments routes.
 Tracks payments to suppliers/providers linked to liabilities.
+Creates CashMovement automatically so payments appear in Caja and Utilidad.
 """
 
 from datetime import datetime
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 from typing import List
 from app.database import get_db
-from app.models import ProviderPayment, Liability, User
+from app.models import ProviderPayment, Liability, CashMovement, User
 from app.auth import get_current_user
 from app.helpers import add_history_entry
 from app.schemas import ProviderPaymentCreate, ProviderPaymentResponse
@@ -57,7 +58,7 @@ def get_payments(db: Session = Depends(get_db), current_user: User = Depends(get
 
 @router.post("/", response_model=ProviderPaymentResponse, status_code=status.HTTP_201_CREATED)
 def create_payment(data: ProviderPaymentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Create a new provider payment. Optionally link to a liability."""
+    """Create a new provider payment. Creates CashMovement automatically."""
     if data.amount <= 0:
         raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
 
@@ -70,6 +71,22 @@ def create_payment(data: ProviderPaymentCreate, db: Session = Depends(get_db), c
         if not liability:
             raise HTTPException(status_code=404, detail="Pasivo no encontrado")
 
+    # Create CashMovement (egreso) — money leaving the cash register
+    concept = f"Pago proveedor: {data.creditor}"
+    if data.concept:
+        concept += f" - {data.concept}"
+
+    cm = CashMovement(
+        date=data.date,
+        type="egreso",
+        concept=concept,
+        amount=data.amount,
+        notes=f"Metodo: {data.method}",
+    )
+    db.add(cm)
+    db.flush()  # get cm.id
+
+    # Create ProviderPayment linked to CashMovement
     payment = ProviderPayment(
         date=data.date,
         creditor=data.creditor,
@@ -79,6 +96,7 @@ def create_payment(data: ProviderPaymentCreate, db: Session = Depends(get_db), c
         method=data.method,
         status=data.status,
         notes=data.notes or "",
+        cash_movement_id=cm.id,
     )
     db.add(payment)
     db.commit()
@@ -115,10 +133,25 @@ def get_payment(payment_id: int, db: Session = Depends(get_db), current_user: Us
 
 @router.delete("/{payment_id}")
 def delete_payment(payment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Delete a provider payment."""
+    """Delete a provider payment and its linked CashMovement."""
     payment = db.query(ProviderPayment).filter(ProviderPayment.id == payment_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
+
+    # Delete linked CashMovement
+    if payment.cash_movement_id:
+        cm = db.query(CashMovement).filter(CashMovement.id == payment.cash_movement_id).first()
+        if cm:
+            db.delete(cm)
+
+    # Reverse liability paid_amount if linked
+    if payment.liability_id:
+        liability = db.query(Liability).filter(Liability.id == payment.liability_id).first()
+        if liability:
+            liability.paid_amount = max(0, float(liability.paid_amount or 0) - payment.amount)
+            if liability.status == "pagado" and liability.paid_amount < liability.total_amount:
+                liability.status = "activo"
+            liability.updated_at = datetime.utcnow()
 
     db.delete(payment)
     db.commit()

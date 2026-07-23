@@ -56,6 +56,7 @@ class Client(Base):
     annual_cost = Column(Float, nullable=True)
     status = Column(String(20), default="activo")
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -75,6 +76,7 @@ class Payment(Base):
     method = Column(String(20), nullable=False)
     status = Column(String(20), default="pagado")
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     client = relationship("Client", back_populates="payments")
@@ -96,6 +98,7 @@ class Asset(Base):
     category = Column(String(100), nullable=True)  # Equipo de red, Herramienta, Vehiculo, etc.
     status = Column(String(20), default="bueno")
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -115,6 +118,7 @@ class Liability(Base):
     interest_rate = Column(Float, nullable=True)
     status = Column(String(20), default="activo")  # activo, pagado, vencido
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -131,6 +135,7 @@ class CashMovement(Base):
     concept = Column(String(200), nullable=False)
     amount = Column(Float, nullable=False)
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -162,6 +167,7 @@ class ProviderPayment(Base):
     method = Column(String(20), default="efectivo")
     status = Column(String(20), default="pagado")
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -190,6 +196,7 @@ class Expense(Base):
     start_date = Column(Date, nullable=False)
     last_paid_date = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -208,6 +215,7 @@ class ExpensePayment(Base):
     method = Column(String(20), default="efectivo")  # efectivo, transferencia, tarjeta
     concept = Column(String(300), nullable=True)
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     expense = relationship("Expense", back_populates="payments")
@@ -226,6 +234,7 @@ class Income(Base):
     method = Column(String(20), default="efectivo")  # efectivo, transferencia, tarjeta
     cash_movement_id = Column(Integer, nullable=True)  # linked CashMovement
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     client = relationship("Client", foreign_keys=[client_id])
@@ -247,6 +256,7 @@ class InventoryItem(Base):
     unit_cost = Column(Float, default=0)
     location = Column(String(200), nullable=True)  # where stored
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -266,6 +276,7 @@ class InventoryMovement(Base):
     concept = Column(String(300), nullable=True)
     reference = Column(String(200), nullable=True)  # invoice #, work order, etc.
     notes = Column(Text, nullable=True)
+    cash_movement_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     item = relationship("InventoryItem", back_populates="movements")
