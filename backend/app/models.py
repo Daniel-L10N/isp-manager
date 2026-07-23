@@ -227,7 +227,6 @@ class Income(Base):
     concept = Column(String(300), nullable=True)  # what the payment is for
     method = Column(String(20), default="efectivo")  # efectivo, transferencia, tarjeta
     cash_movement_id = Column(Integer, nullable=True)  # linked CashMovement
-    expense_id = Column(Integer, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
