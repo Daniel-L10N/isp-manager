@@ -130,6 +130,7 @@ class CashMovement(Base):
     type = Column(String(20), nullable=False)
     concept = Column(String(200), nullable=False)
     amount = Column(Float, nullable=False)
+    source = Column(String(20), default="cash_direct")  # income_module, expense_module, cash_direct
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -162,8 +163,6 @@ class ProviderPayment(Base):
     method = Column(String(20), default="efectivo")
     status = Column(String(20), default="pagado")
     notes = Column(Text, nullable=True)
-    cash_movement_id = Column(Integer, nullable=True)
-    expense_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

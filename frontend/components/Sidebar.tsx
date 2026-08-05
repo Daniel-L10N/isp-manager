@@ -62,6 +62,7 @@ const menuStructure: MenuItem[] = [
   { href: '/assets', label: 'Activos', icon: Package },
   { href: '/inventory', label: 'Inventario', icon: Boxes },
   { href: '/history', label: 'Historial', icon: History },
+  { href: '/settings', label: 'Configuración', icon: Settings },
 ];
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {

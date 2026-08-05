@@ -28,14 +28,11 @@ FREQUENCY_MONTHS = {
     "semestral": 6,
     "anual": 12,
     "18meses": 18,
-    "unico_pago": 0,
 }
 
 
 def calc_next_due(start_date: date, last_paid_date: date | None, frequency: str) -> date | None:
     """Calculate the next due date based on frequency."""
-    if frequency == "unico_pago":
-        return None if last_paid_date else start_date
     months = FREQUENCY_MONTHS.get(frequency, 1)
     base = last_paid_date or start_date
     next_due = base + relativedelta(months=months)
@@ -95,11 +92,10 @@ def get_summary(db: Session = Depends(get_db), current_user: User = Depends(get_
     categories = {}
     for e in expenses:
         months = FREQUENCY_MONTHS.get(e.frequency, 1)
-        if months > 0:
-            monthly_equiv = e.amount / months
-            total_monthly += monthly_equiv
-            cat = e.category or "Sin categoría"
-            categories[cat] = categories.get(cat, 0) + monthly_equiv
+        monthly_equiv = e.amount / months
+        total_monthly += monthly_equiv
+        cat = e.category or "Sin categoría"
+        categories[cat] = categories.get(cat, 0) + monthly_equiv
 
     overdue_count = sum(1 for e in expenses if is_overdue(calc_next_due(e.start_date, e.last_paid_date, e.frequency)))
 
@@ -145,7 +141,6 @@ def get_frequencies():
         {"value": "semestral", "label": "Semestral (cada 6 meses)", "months": 6},
         {"value": "anual", "label": "Anual", "months": 12},
         {"value": "18meses", "label": "Cada 18 meses", "months": 18},
-        {"value": "unico_pago", "label": "Unico Pago", "months": 0},
     ]
 
 
@@ -235,6 +230,7 @@ def record_payment(expense_id: int, data: ExpensePaymentCreate, db: Session = De
         type="egreso",
         concept=f"Gasto: {expense.concept}",
         amount=data.amount,
+        source="expense_module",
         notes=f"Método: {data.method}",
     )
     db.add(cash_movement)

@@ -30,7 +30,7 @@ export default function NotificationSettings() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const API_BASE = '/isp-manager';
+  const API_BASE = '';
 
 const getToken = () => {
     if (typeof window !== 'undefined') {

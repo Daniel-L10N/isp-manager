@@ -11,7 +11,7 @@ from sqlalchemy import func
 from typing import List, Optional
 from app.database import get_db
 from app.models import Client, Plan, Payment, Setting, CashMovement, History, User
-from app.auth import get_current_user
+from app.auth import get_current_user, require_admin
 from app.schemas import (
     ClientCreate, ClientUpdate, ClientResponse, ClientListResponse,
     PaymentCreate, PaymentResponse,
@@ -281,7 +281,7 @@ def update_client(
 
 
 @router.delete("/{client_id}")
-def delete_client(client_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_client(client_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     """Soft-delete a client (marks as inactive, keeps history)."""
     client = db.query(Client).filter(Client.id == client_id, Client.is_active == True).first()
     if not client:

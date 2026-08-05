@@ -3,7 +3,7 @@
  * Handles authentication, requests, and response parsing.
  */
 
-const API_BASE = '/isp-manager';
+const API_BASE = '';
 
 interface RequestOptions {
   method?: string;

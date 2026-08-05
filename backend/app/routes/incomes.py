@@ -78,6 +78,7 @@ def create_income(data: IncomeCreate, db: Session = Depends(get_db), current_use
         type="ingreso",
         concept=f"Pago cliente: {client_name}" + (f" - {data.concept}" if data.concept else ""),
         amount=data.amount,
+        source="income_module",
         notes=f"Método: {data.method}",
     )
     db.add(cm)

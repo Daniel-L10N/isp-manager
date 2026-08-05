@@ -7,7 +7,7 @@ Enriches data with Income client info and Expense category/provider.
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, extract
+from sqlalchemy import func, and_, or_, extract
 from typing import Optional
 from app.database import get_db
 from app.models import CashMovement, Income, ExpensePayment, Expense, User
@@ -75,8 +75,17 @@ def get_profit(
         }
 
     # Query all cash movements in range
+    # Include: all expenses (formal + direct) and only formal incomes
+    # Exclude: direct income from caja (personal loans / admin deposits)
     movements = db.query(CashMovement).filter(
-        and_(CashMovement.date >= start, CashMovement.date <= end)
+        and_(
+            CashMovement.date >= start,
+            CashMovement.date <= end,
+            or_(
+                CashMovement.type == "egreso",                          # All expenses count
+                CashMovement.source == "income_module",                  # Only formal incomes
+            ),
+        )
     ).all()
 
     # Separate income and expenses with enrichment
@@ -181,11 +190,20 @@ def get_monthly_profit(
             end = date(year, month, last_day)
 
         income = db.query(func.coalesce(func.sum(CashMovement.amount), 0)).filter(
-            and_(CashMovement.type == "ingreso", CashMovement.date >= start, CashMovement.date <= end)
+            and_(
+                CashMovement.type == "ingreso",
+                CashMovement.source == "income_module",
+                CashMovement.date >= start,
+                CashMovement.date <= end,
+            )
         ).scalar()
 
         expenses = db.query(func.coalesce(func.sum(CashMovement.amount), 0)).filter(
-            and_(CashMovement.type == "egreso", CashMovement.date >= start, CashMovement.date <= end)
+            and_(
+                CashMovement.type == "egreso",
+                CashMovement.date >= start,
+                CashMovement.date <= end,
+            )
         ).scalar()
 
         inc = float(income)
